@@ -1,8 +1,11 @@
 from datetime import datetime, timezone
 from typing import Optional, Tuple, List
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
+
+logger = logging.getLogger("resq.emergency_service")
 
 from app.models.emergency import EmergencyRequest, EmergencyStatusHistory
 from app.models.ambulance import Ambulance
@@ -341,6 +344,12 @@ class EmergencyService:
             new_status = alias_map[new_status]
 
         old_status = emergency.status
+        if old_status == EmergencyStatus.CANCELLED and new_status != EmergencyStatus.CANCELLED:
+            logger.warning(
+                f"Emergency {emergency_id} is already CANCELLED. Discarding status transition to {new_status.value}."
+            )
+            return emergency
+
         emergency.status = new_status
         emergency.updated_at = datetime.now(timezone.utc)
 
@@ -471,6 +480,15 @@ class EmergencyService:
             await manager.send_to_hospital(emergency.selected_hospital_id, "STATUS_CHANGE", payload)
         await manager.send_to_dispatchers("EMERGENCY_STATUS_UPDATED", payload)
         await manager.send_to_dispatchers("STATUS_CHANGE", payload)
+
+        if new_status == EmergencyStatus.CANCELLED:
+            await manager.broadcast("EMERGENCY_STATUS_UPDATED", payload)
+            await manager.broadcast("STATUS_CHANGE", payload)
+            await manager.broadcast("SIMULATION_ENDED", {
+                "emergency_id": emergency.id,
+                "status": "CANCELLED",
+                "message": "Emergency cancelled"
+            })
 
         # If arrived on scene or at hospital, immediately broadcast location update to sync all maps
         if new_status == EmergencyStatus.ARRIVED_AT_PICKUP and emergency.pickup_lat and emergency.pickup_lng:

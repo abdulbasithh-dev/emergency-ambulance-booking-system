@@ -72,6 +72,10 @@
         <button onclick="submitManualAssign()" class="btn btn-primary btn-sm" style="width: 100%;">
           <span>🚀 Transmit Manual Dispatch</span>
         </button>
+
+        <button onclick="cancelSelectedEmergency()" class="btn btn-outline btn-sm" style="width: 100%; border-color: rgba(239, 68, 68, 0.5); color: #F87171; background: rgba(239, 68, 68, 0.08); font-weight: 700;">
+          <span>❌ Abort / Cancel Incident</span>
+        </button>
       </div>
 
     </div>
@@ -127,8 +131,10 @@
       if (
         msg.event === 'DISPATCH_REQUEST' ||
         msg.event === 'STATUS_CHANGE' ||
+        msg.event === 'EMERGENCY_STATUS_UPDATED' ||
         msg.event === 'LOCATION_UPDATE' ||
-        msg.event === 'SIMULATION_STARTED'
+        msg.event === 'SIMULATION_STARTED' ||
+        msg.event === 'SIMULATION_ENDED'
       ) {
         fetchDispatcherOverview();
       }
@@ -253,6 +259,33 @@
         RESQ.playChime();
         RESQ.toast('Dispatch Transmitted', 'Assigned unit and sent siren alert', 'emerald');
         fetchDispatcherOverview();
+      }
+    } catch (e) {
+      RESQ.toast('Error', e.message, 'crimson');
+    }
+  }
+
+  async function cancelSelectedEmergency() {
+    if (!selectedEmergency) return;
+    if (!confirm(`Are you sure you want to cancel incident #${selectedEmergency.id}?`)) return;
+    try {
+      const token = localStorage.getItem('resq_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`/api/v1/emergencies/${selectedEmergency.id}/cancel`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ cancellation_reason: 'Dispatcher manual cancellation' })
+      });
+      if (res.ok) {
+        RESQ.toast('Incident Cancelled', `Incident #${selectedEmergency.id} was aborted`, 'amber');
+        selectedEmergency = null;
+        document.getElementById('manual-override-card').style.display = 'none';
+        await fetchDispatcherOverview();
+      } else {
+        const err = await res.json().catch(() => ({ detail: 'Failed to cancel incident' }));
+        RESQ.toast('Error', err.detail || 'Could not cancel incident', 'crimson');
       }
     } catch (e) {
       RESQ.toast('Error', e.message, 'crimson');

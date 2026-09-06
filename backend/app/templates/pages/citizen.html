@@ -193,6 +193,11 @@
           <div id="hosp-icu-text" style="font-size: 0.8rem; color: var(--cyan-400); margin-top: 2px;">ICU Beds Available: 6 &bull; ER Status: Normal</div>
         </div>
 
+        <!-- Cancel Emergency Action Button inside Unit Card -->
+        <button type="button" id="card-cancel-emergency-btn" onclick="cancelActiveEmergency()" class="btn btn-outline" style="border-color: rgba(239, 68, 68, 0.5); color: #F87171; width: 100%; padding: 11px; font-size: 0.9rem; font-weight: 700; margin-top: 2px; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(239, 68, 68, 0.08);">
+          <span>❌ Cancel Emergency Request</span>
+        </button>
+
       </div>
 
     </div>
@@ -294,8 +299,12 @@
           updateAmbulancePosition(lat, lng, d.heading || 0, d.speed || 40);
         }
       } else if (msg.event === 'STATUS_CHANGE' || msg.event === 'EMERGENCY_STATUS_UPDATED') {
-        if (activeEmergency) {
-          activeEmergency.status = msg.data.status;
+        const newStatus = msg.data?.status;
+        if (newStatus === 'CANCELLED' || (activeEmergency && msg.data?.emergency_id === activeEmergency.id && newStatus === 'CANCELLED')) {
+          renderStandbyState();
+          RESQ.toast('Emergency Cancelled', 'Distress request has been aborted', 'amber');
+        } else if (activeEmergency) {
+          activeEmergency.status = newStatus;
           updateHUD(activeEmergency);
         } else {
           checkActiveEmergency();
@@ -303,6 +312,7 @@
       } else if (msg.event === 'SIMULATION_STARTED') {
         checkActiveEmergency();
       } else if (msg.event === 'SIMULATION_ENDED') {
+        renderStandbyState();
         checkActiveEmergency();
       }
     });
@@ -313,10 +323,14 @@
 
   async function checkActiveEmergency() {
     try {
-      const res = await fetch('/api/v1/emergencies/active');
+      const token = localStorage.getItem('resq_token');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/v1/emergencies/active', { headers });
       if (res.ok) {
         const data = await res.json();
-        if (data && data.id) {
+        if (data && data.id && data.status !== 'CANCELLED' && data.status !== 'CASE_COMPLETED') {
           activeEmergency = data;
           renderActiveState(data);
           return;
@@ -476,18 +490,34 @@
     if (!activeEmergency) return;
     if (!confirm('Are you sure you want to cancel this emergency request?')) return;
 
+    const cancelBtn = document.getElementById('cancel-emergency-btn');
+    const cardCancelBtn = document.getElementById('card-cancel-emergency-btn');
+    if (cancelBtn) cancelBtn.disabled = true;
+    if (cardCancelBtn) cardCancelBtn.disabled = true;
+
     try {
+      const token = localStorage.getItem('resq_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`/api/v1/emergencies/${activeEmergency.id}/cancel`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify({ cancellation_reason: 'Citizen cancelled via console' })
       });
       if (res.ok) {
         RESQ.toast('Emergency Cancelled', 'Distress request has been aborted', 'amber');
-        checkActiveEmergency();
+        renderStandbyState();
+        await checkActiveEmergency();
+      } else {
+        const err = await res.json().catch(() => ({ detail: 'Failed to cancel emergency' }));
+        RESQ.toast('Cancel Failed', err.detail || 'Could not cancel emergency', 'crimson');
       }
     } catch (e) {
       RESQ.toast('Cancel Error', e.message, 'crimson');
+    } finally {
+      if (cancelBtn) cancelBtn.disabled = false;
+      if (cardCancelBtn) cardCancelBtn.disabled = false;
     }
   }
 </script>

@@ -48,6 +48,7 @@ const RESQ = {
       this.user = data.user;
       localStorage.setItem('resq_user', JSON.stringify(data.user));
       localStorage.setItem('resq_token', data.access_token);
+      document.cookie = `resq_token=${data.access_token}; path=/; max-age=86400; SameSite=Lax`;
       
       // Navigate to target URL
       if (targetUrl) {
@@ -294,9 +295,13 @@ const RESQ = {
       this.setSimulationState(true);
     } else if (msg.event === 'SIMULATION_ENDED') {
       this.setSimulationState(false);
-      this.toast('Simulation Complete', 'Emergency lifecycle finished successfully', 'emerald');
-      if (window.confetti) {
-        window.confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+      if (msg.data?.status === 'CANCELLED' || msg.data?.message?.toLowerCase().includes('cancel')) {
+        this.toast('Simulation Cancelled', 'Emergency response mission was aborted', 'amber');
+      } else {
+        this.toast('Simulation Complete', 'Emergency lifecycle finished successfully', 'emerald');
+        if (window.confetti) {
+          window.confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+        }
       }
     } else if (msg.event === 'DISPATCH_REQUEST' || msg.event === 'NEW_DISPATCH_OFFER') {
       this.playSiren();

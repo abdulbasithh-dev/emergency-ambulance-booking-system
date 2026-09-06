@@ -161,4 +161,6 @@ class ConnectionManager:
             for ws in list(sockets):
                 await self._safe_send(ws, message)
 
+    broadcast = broadcast_all
+
 manager = ConnectionManager()

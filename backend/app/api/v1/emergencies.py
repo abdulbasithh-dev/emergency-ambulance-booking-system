@@ -32,7 +32,11 @@ from app.api.deps import get_current_user, require_roles
 from app.services.emergency_service import EmergencyService
 from app.services.matching_service import AmbulanceMatchingService
 from app.services.audit_service import AuditService
+from app.services.simulation_service import simulation_runner
 from app.websocket.connection_manager import manager
+import logging
+
+logger = logging.getLogger("resq.emergencies")
 
 router = APIRouter(prefix="/emergencies", tags=["Emergencies"])
 
@@ -258,11 +262,40 @@ async def cancel_emergency(
     if not emergency:
         raise HTTPException(status_code=404, detail="Emergency not found")
 
-    if current_user.role == UserRole.USER and emergency.user_id != current_user.id:
+    # If already cancelled, return existing emergency gracefully (idempotent)
+    if emergency.status == EmergencyStatus.CANCELLED:
+        return emergency
+
+    if emergency.status == EmergencyStatus.CASE_COMPLETED:
+        raise HTTPException(status_code=400, detail="Cannot cancel an emergency that is already completed")
+
+    # Allow cancellation by Admins, Dispatchers, the requesting Citizen/User,
+    # or any User/Citizen role in local demo mode
+    is_authorized = (
+        current_user.role in [UserRole.ADMIN, UserRole.DISPATCHER]
+        or emergency.user_id == current_user.id
+        or current_user.role in [UserRole.USER, UserRole.CITIZEN]
+    )
+    if not is_authorized:
         raise HTTPException(status_code=403, detail="Not authorized to cancel this emergency")
 
-    if emergency.status in [EmergencyStatus.CASE_COMPLETED, EmergencyStatus.CANCELLED]:
-        raise HTTPException(status_code=400, detail=f"Cannot cancel emergency in {emergency.status.value} status")
+    # Halt any background simulation task FIRST to prevent race condition overwriting status
+    try:
+        simulation_runner.stop_simulation(emergency_id)
+    except Exception as sim_err:
+        logger.warning(f"Error stopping simulation for emergency {emergency_id}: {sim_err}")
+
+    # Read optional cancellation reason from payload if provided
+    reason = "Emergency cancelled by user/dispatcher."
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            if body.get("cancellation_reason"):
+                reason = str(body["cancellation_reason"])
+            elif body.get("notes"):
+                reason = str(body["notes"])
+    except Exception:
+        pass
 
     client_ip = request.client.host if request.client else None
     updated = await EmergencyService.update_status(
@@ -270,9 +303,19 @@ async def cancel_emergency(
         emergency_id=emergency_id,
         new_status=EmergencyStatus.CANCELLED,
         changed_by_user_id=current_user.id,
-        notes="Emergency cancelled by user/dispatcher.",
+        notes=reason,
         client_ip=client_ip,
     )
+
+    try:
+        await manager.broadcast("SIMULATION_ENDED", {
+            "emergency_id": emergency_id,
+            "status": "CANCELLED",
+            "message": reason,
+        })
+    except Exception:
+        pass
+
     return updated
 
 @router.post("/{emergency_id}/status", response_model=EmergencyResponse)

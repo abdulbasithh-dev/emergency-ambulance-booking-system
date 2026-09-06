@@ -11,6 +11,7 @@ from app.models.ambulance import Ambulance
 from app.models.enums import EmergencyType, EmergencyPriority, UserRole
 from app.services.emergency_service import EmergencyService
 from app.services.simulation_service import simulation_runner
+from app.websocket.connection_manager import manager
 
 router = APIRouter(prefix="/simulation", tags=["Live Simulation Engine"])
 
@@ -102,6 +103,14 @@ async def stop_all_simulations():
     active_ids = list(simulation_runner.active_tasks.keys())
     for eid in active_ids:
         simulation_runner.stop_simulation(eid)
+    try:
+        await manager.broadcast("SIMULATION_ENDED", {
+            "status": "STOPPED",
+            "stopped_emergencies": active_ids,
+            "message": "All simulations stopped",
+        })
+    except Exception:
+        pass
     return {"status": "stopped", "is_running": False, "stopped_emergencies": active_ids}
 
 @router.post("/quick-demo")
@@ -120,4 +129,12 @@ async def start_quick_demo(
 @router.post("/stop/{emergency_id}")
 async def stop_simulation(emergency_id: int):
     simulation_runner.stop_simulation(emergency_id)
+    try:
+        await manager.broadcast("SIMULATION_ENDED", {
+            "emergency_id": emergency_id,
+            "status": "STOPPED",
+            "message": f"Simulation stopped for emergency {emergency_id}",
+        })
+    except Exception:
+        pass
     return {"status": "stopped", "emergency_id": emergency_id}

@@ -168,8 +168,21 @@
           updateDriverMarker(lat, lng, d.heading || 0);
         }
       } else if (msg.event === 'STATUS_CHANGE' || msg.event === 'EMERGENCY_STATUS_UPDATED') {
+        const newStatus = msg.data?.status;
+        if (newStatus === 'CANCELLED') {
+          RESQ.toast('Mission Cancelled', 'Emergency dispatch call was aborted', 'amber');
+          activeEmergency = null;
+          renderStandby();
+        }
         fetchDriverState();
       } else if (msg.event === 'SIMULATION_STARTED') {
+        fetchDriverState();
+      } else if (msg.event === 'SIMULATION_ENDED') {
+        if (msg.data?.status === 'CANCELLED' || (msg.data?.message && msg.data.message.toLowerCase().includes('cancel'))) {
+          RESQ.toast('Mission Cancelled', 'Emergency response mission was aborted', 'amber');
+        }
+        activeEmergency = null;
+        renderStandby();
         fetchDriverState();
       }
     });
@@ -192,7 +205,7 @@
         updateDriverMarker(lat, lng, driverAmbulance.current_heading || 0);
       }
 
-      if (emRes && emRes.id) {
+      if (emRes && emRes.id && emRes.status !== 'CANCELLED' && emRes.status !== 'CASE_COMPLETED') {
         activeEmergency = emRes;
         renderActiveEmergency(emRes);
       } else {

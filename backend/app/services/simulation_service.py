@@ -3,6 +3,7 @@ import logging
 import math
 from typing import List, Tuple, Optional
 from datetime import datetime, timezone
+from sqlalchemy import select
 
 from app.core.database import AsyncSessionLocal
 from app.models.emergency import EmergencyRequest
@@ -48,16 +49,34 @@ class SimulationRunner:
         self.active_tasks: dict = {}
 
     def stop_simulation(self, emergency_id: int):
-        if emergency_id in self.active_tasks:
-            self.active_tasks[emergency_id].cancel()
-            del self.active_tasks[emergency_id]
-            logger.info(f"Simulation stopped for emergency {emergency_id}")
+        task = self.active_tasks.pop(emergency_id, None)
+        if task and not task.done():
+            task.cancel()
+        logger.info(f"Simulation stopped for emergency {emergency_id}")
+
+    def stop_all(self):
+        for emergency_id in list(self.active_tasks.keys()):
+            self.stop_simulation(emergency_id)
+
+    def is_active(self, emergency_id: int) -> bool:
+        return emergency_id in self.active_tasks
 
     async def run_end_to_end(self, emergency_id: int, step_delay: float = 2.0):
         """Asynchronously steps through the complete emergency dispatch & navigation lifecycle."""
         logger.info(f"Starting end-to-end simulation for emergency {emergency_id}")
         try:
             async with AsyncSessionLocal() as db:
+                async def is_cancelled_or_stopped() -> bool:
+                    if emergency_id not in self.active_tasks:
+                        return True
+                    emg_check = await db.execute(
+                        select(EmergencyRequest.status).where(EmergencyRequest.id == emergency_id)
+                    )
+                    st = emg_check.scalar_one_or_none()
+                    if not st or st in [EmergencyStatus.CANCELLED, EmergencyStatus.CASE_COMPLETED]:
+                        return True
+                    return False
+
                 emergency = await EmergencyService.get_emergency_by_id(db, emergency_id)
                 if not emergency or not emergency.assigned_ambulance:
                     logger.error(f"Cannot simulate emergency {emergency_id}: No assigned ambulance")
@@ -68,6 +87,9 @@ class SimulationRunner:
                 driver_id = amb.driver_id or 1
                 
                 # Step 1: Driver Accepts
+                if await is_cancelled_or_stopped():
+                    logger.info(f"Simulation aborted before step 1 for emergency {emergency_id}")
+                    return
                 await asyncio.sleep(step_delay)
                 await EmergencyService.update_status(
                     db, emergency_id, EmergencyStatus.DRIVER_ACCEPTED,
@@ -75,6 +97,9 @@ class SimulationRunner:
                 )
 
                 # Step 2: En route to pickup
+                if await is_cancelled_or_stopped():
+                    logger.info(f"Simulation aborted before step 2 for emergency {emergency_id}")
+                    return
                 await asyncio.sleep(step_delay)
                 await EmergencyService.update_status(
                     db, emergency_id, EmergencyStatus.EN_ROUTE_TO_PICKUP,
@@ -84,6 +109,9 @@ class SimulationRunner:
                 # Simulate navigation along route from ambulance position to pickup
                 pickup_route = interpolate_points(amb.current_lat, amb.current_lng, emergency.pickup_lat, emergency.pickup_lng, steps=6)
                 for lat, lng, heading in pickup_route:
+                    if await is_cancelled_or_stopped():
+                        logger.info(f"Simulation route aborted for emergency {emergency_id}")
+                        return
                     await asyncio.sleep(step_delay * 0.8)
                     amb.current_lat = lat
                     amb.current_lng = lng
@@ -104,6 +132,9 @@ class SimulationRunner:
                     await manager.send_to_dispatchers("AMBULANCE_LOCATION_UPDATE", loc_payload)
 
                 # Step 3: Arrived at pickup
+                if await is_cancelled_or_stopped():
+                    logger.info(f"Simulation aborted before step 3 for emergency {emergency_id}")
+                    return
                 await asyncio.sleep(step_delay)
                 await EmergencyService.update_status(
                     db, emergency_id, EmergencyStatus.ARRIVED_AT_PICKUP,
@@ -111,6 +142,9 @@ class SimulationRunner:
                 )
 
                 # Step 4: Patient onboard
+                if await is_cancelled_or_stopped():
+                    logger.info(f"Simulation aborted before step 4 for emergency {emergency_id}")
+                    return
                 await asyncio.sleep(step_delay * 1.2)
                 await EmergencyService.update_status(
                     db, emergency_id, EmergencyStatus.PATIENT_ONBOARD,
@@ -118,6 +152,9 @@ class SimulationRunner:
                 )
 
                 # Step 5: Recommended Hospital selection
+                if await is_cancelled_or_stopped():
+                    logger.info(f"Simulation aborted before step 5 for emergency {emergency_id}")
+                    return
                 await asyncio.sleep(step_delay)
                 recs = await HospitalRecommendationService.get_recommendations(
                     db, emergency.pickup_lat, emergency.pickup_lng, emergency.emergency_type
@@ -130,6 +167,9 @@ class SimulationRunner:
                 )
 
                 # Step 6: Hospital accepts incoming case
+                if await is_cancelled_or_stopped():
+                    logger.info(f"Simulation aborted before step 6 for emergency {emergency_id}")
+                    return
                 await asyncio.sleep(step_delay)
                 hosp = await db.get(Hospital, best_hosp_id)
                 hosp_payload = {
@@ -144,6 +184,9 @@ class SimulationRunner:
                 await manager.send_to_dispatchers("HOSPITAL_ACCEPTED_CASE", hosp_payload)
 
                 # Step 7: En route to hospital
+                if await is_cancelled_or_stopped():
+                    logger.info(f"Simulation aborted before step 7 for emergency {emergency_id}")
+                    return
                 await asyncio.sleep(step_delay)
                 await EmergencyService.update_status(
                     db, emergency_id, EmergencyStatus.EN_ROUTE_TO_HOSPITAL,
@@ -154,6 +197,9 @@ class SimulationRunner:
                 if hosp:
                     hosp_route = interpolate_points(emergency.pickup_lat, emergency.pickup_lng, hosp.latitude, hosp.longitude, steps=7)
                     for lat, lng, heading in hosp_route:
+                        if await is_cancelled_or_stopped():
+                            logger.info(f"Simulation hospital route aborted for emergency {emergency_id}")
+                            return
                         await asyncio.sleep(step_delay * 0.8)
                         amb.current_lat = lat
                         amb.current_lng = lng
@@ -175,6 +221,9 @@ class SimulationRunner:
                         await manager.send_to_dispatchers("AMBULANCE_LOCATION_UPDATE", loc_payload)
 
                 # Step 8: Arrived at hospital
+                if await is_cancelled_or_stopped():
+                    logger.info(f"Simulation aborted before step 8 for emergency {emergency_id}")
+                    return
                 await asyncio.sleep(step_delay)
                 await EmergencyService.update_status(
                     db, emergency_id, EmergencyStatus.ARRIVED_AT_HOSPITAL,
@@ -182,6 +231,9 @@ class SimulationRunner:
                 )
 
                 # Step 9: Case Completed
+                if await is_cancelled_or_stopped():
+                    logger.info(f"Simulation aborted before step 9 for emergency {emergency_id}")
+                    return
                 await asyncio.sleep(step_delay * 1.5)
                 await EmergencyService.update_status(
                     db, emergency_id, EmergencyStatus.CASE_COMPLETED,
