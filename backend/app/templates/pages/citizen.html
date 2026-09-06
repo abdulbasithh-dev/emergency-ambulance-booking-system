@@ -12,7 +12,7 @@
         <span>Citizen Emergency Dispatch Console</span>
         <span id="emergency-status-badge" class="badge badge-amber" style="font-size: 0.75rem;">STANDBY</span>
       </h1>
-      <p style="font-size: 0.88rem; color: #94A3B8;">1-Click distress call, dynamic ambulance routing, and clinical capacity-matched hospital triage.</p>
+      <p style="font-size: 0.88rem; color: #94A3B8;">Select nearest trauma facility, alert hospital admission, and track emergency ALS ambulance in real-time.</p>
     </div>
 
     <!-- Quick Action / Demo Trigger -->
@@ -42,12 +42,12 @@
     <div style="display: flex; align-items: center; justify-content: space-between; position: relative; overflow-x: auto; padding-bottom: 8px;">
       <div id="step-1" class="step-item active">
         <div class="step-circle">1</div>
-        <div class="step-label">Triage Pending</div>
+        <div class="step-label">Hospital Alerted</div>
       </div>
       <div class="step-line"></div>
       <div id="step-2" class="step-item">
         <div class="step-circle">2</div>
-        <div class="step-label">Assigned</div>
+        <div class="step-label">Driver Assigned</div>
       </div>
       <div class="step-line"></div>
       <div id="step-3" class="step-item">
@@ -62,7 +62,7 @@
       <div class="step-line"></div>
       <div id="step-5" class="step-item">
         <div class="step-circle">5</div>
-        <div class="step-label">Patient Loaded</div>
+        <div class="step-label">Patient Onboard</div>
       </div>
       <div class="step-line"></div>
       <div id="step-6" class="step-item">
@@ -80,10 +80,22 @@
         <div class="step-label">Handover</div>
       </div>
     </div>
+
+    <!-- Live Hospital Admission Status Banner -->
+    <div id="hud-hospital-banner" style="margin-top: 14px; padding: 12px 18px; border-radius: 8px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span id="hud-hosp-icon" style="font-size: 1.25rem;">📡</span>
+        <div>
+          <strong id="hud-hosp-title" style="color: #FCD34D; font-size: 0.88rem;">Inbound Alert Sent to Hospital</strong>
+          <div id="hud-hosp-sub" style="font-size: 0.78rem; color: #CBD5E1;">Awaiting clinical triage and admission acceptance...</div>
+        </div>
+      </div>
+      <span id="hud-hosp-badge" class="badge badge-amber" style="font-size: 0.72rem;">AWAITING ACCEPTANCE</span>
+    </div>
   </div>
 
   <!-- Main Grid: Map & Details / SOS Form -->
-  <div style="display: grid; grid-template-columns: 1fr 380px; gap: 24px; min-height: 580px;">
+  <div style="display: grid; grid-template-columns: 1fr 400px; gap: 24px; min-height: 580px;">
     
     <!-- Left: Live Tracking Map -->
     <div class="glass-panel" style="padding: 16px; display: flex; flex-direction: column; gap: 12px; position: relative;">
@@ -92,7 +104,7 @@
           <span>🗺️ Live Vehicle Radar</span>
           <span id="vehicle-live-tag" class="badge badge-emerald" style="display: none; font-size: 0.65rem;">GPS ACTIVE</span>
         </span>
-        <div style="font-size: 0.78rem; color: #94A3B8;">Real-time turn-by-turn simulation</div>
+        <div style="font-size: 0.78rem; color: #94A3B8;">Real-time GPS tracking & turn-by-turn navigation</div>
       </div>
       <div id="citizen-tracking-map" style="flex: 1; min-height: 480px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1);"></div>
     </div>
@@ -104,12 +116,12 @@
       <div id="sos-form-card" class="glass-panel" style="padding: 24px; display: flex; flex-direction: column; gap: 18px;">
         <div style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 14px;">
           <h2 style="font-size: 1.25rem; color: #FFF; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
-            <span>🚨</span> Request Emergency Unit
+            <span>🚨</span> Request Emergency Care
           </h2>
-          <p style="font-size: 0.8rem; color: #94A3B8;">Nearest ALS unit will be automatically dispatched.</p>
+          <p style="font-size: 0.8rem; color: #94A3B8;">Select your preferred nearest hospital, notify ER admission, and dispatch the closest available ambulance.</p>
         </div>
 
-        <form id="sos-dispatch-form" onsubmit="submitEmergencySOS(event)" style="display: flex; flex-direction: column; gap: 14px;">
+        <form id="sos-dispatch-form" onsubmit="promptHospitalSelection(event)" style="display: flex; flex-direction: column; gap: 14px;">
           <div>
             <label style="font-size: 0.82rem; font-weight: 600; color: #CBD5E1; margin-bottom: 6px; display: block;">Emergency Incident Type</label>
             <select id="sos-type" class="input-field" required>
@@ -153,7 +165,7 @@
           </div>
 
           <button type="submit" id="sos-submit-btn" class="btn btn-primary" style="padding: 14px; font-size: 1.05rem; margin-top: 8px; font-weight: 800; letter-spacing: 0.02em;">
-            <span>🚨 DISPATCH AMBULANCE NOW</span>
+            <span>🚨 SELECT NEAREST HOSPITAL &amp; DISPATCH</span>
           </button>
         </form>
       </div>
@@ -162,7 +174,7 @@
       <div id="assigned-unit-card" class="glass-panel" style="display: none; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 12px;">
           <h3 style="font-size: 1.05rem; color: #FFF; display: flex; align-items: center; gap: 8px;">
-            <span>🚑 Assigned Unit</span>
+            <span>🚑 Assigned Ambulance</span>
           </h3>
           <span id="amb-type-badge" class="badge badge-crimson">ALS ICU</span>
         </div>
@@ -188,7 +200,10 @@
 
         <!-- Destination Hospital -->
         <div style="background: rgba(13, 19, 34, 0.6); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.06);">
-          <div style="font-size: 0.75rem; color: #94A3B8; margin-bottom: 4px;">RECOMMENDED TRAUMA CENTER</div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <span style="font-size: 0.75rem; color: #94A3B8;">CONFIRMED HOSPITAL DESTINATION</span>
+            <span id="hosp-status-pill" class="badge badge-emerald" style="font-size: 0.65rem;">ACCEPTED</span>
+          </div>
           <div id="hosp-name-text" style="font-weight: 700; color: #FFF; font-size: 0.95rem;">Apollo Hospital - Trauma Center</div>
           <div id="hosp-icu-text" style="font-size: 0.8rem; color: var(--cyan-400); margin-top: 2px;">ICU Beds Available: 6 &bull; ER Status: Normal</div>
         </div>
@@ -200,6 +215,30 @@
 
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Select Nearest Hospital -->
+<div id="hospital-select-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 20px;">
+  <div class="glass-panel" style="max-width: 680px; width: 100%; max-height: 88vh; display: flex; flex-direction: column; gap: 16px; padding: 24px; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 20px 50px rgba(0,0,0,0.8);">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px;">
+      <div>
+        <h2 style="font-size: 1.25rem; color: #FFF; margin: 0; display: flex; align-items: center; gap: 8px;">
+          <span>🏥</span> Select Destination Emergency Hospital
+        </h2>
+        <p style="font-size: 0.8rem; color: #94A3B8; margin-top: 4px;">Choose the nearest trauma center. An admission alert will be sent to the facility immediately.</p>
+      </div>
+      <button type="button" onclick="closeHospitalModal()" class="btn btn-outline btn-sm" style="padding: 4px 10px; font-size: 0.85rem;">✕</button>
+    </div>
+
+    <div id="hospital-loading-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 36px 20px; color: #94A3B8; gap: 10px;">
+      <span class="pulsing-dot" style="width: 12px; height: 12px;"></span>
+      <span style="font-size: 0.9rem;">Scanning nearest trauma centers & live ICU capacity...</span>
+    </div>
+
+    <div id="hospital-cards-container" style="display: flex; flex-direction: column; gap: 12px; overflow-y: auto; max-height: 55vh; padding-right: 4px;">
+      <!-- Populated dynamically via JS -->
     </div>
   </div>
 </div>
@@ -253,6 +292,23 @@
     margin: 0 4px;
     margin-bottom: 22px;
   }
+  .hosp-rec-card {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    transition: all 0.25s ease;
+  }
+  .hosp-rec-card:hover {
+    border-color: rgba(56, 189, 248, 0.4);
+    background: rgba(15, 23, 42, 0.95);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
 </style>
 {% endblock %}
 
@@ -266,8 +322,8 @@
   let routePolyline = null;
 
   const STATUS_STEP_MAP = {
-    'PENDING': 1, 'REQUESTED': 1, 'SEARCHING_AMBULANCE': 1,
-    'ASSIGNED': 2, 'AMBULANCE_ASSIGNED': 2, 'DRIVER_ACCEPTED': 2,
+    'PENDING': 1, 'REQUESTED': 1, 'SEARCHING_AMBULANCE': 1, 'NOTIFIED': 1,
+    'HOSPITAL_ACCEPTED': 2, 'ASSIGNED': 2, 'AMBULANCE_ASSIGNED': 2, 'DRIVER_ACCEPTED': 2,
     'AMBULANCE_EN_ROUTE': 3, 'EN_ROUTE_TO_PICKUP': 3,
     'ARRIVED_AT_SCENE': 4, 'ARRIVED_AT_PICKUP': 4,
     'PATIENT_LOADED': 5, 'PATIENT_ONBOARD': 5,
@@ -298,11 +354,28 @@
         if (lat && lng) {
           updateAmbulancePosition(lat, lng, d.heading || 0, d.speed || 40);
         }
+      } else if (msg.event === 'HOSPITAL_ACCEPTED_CASE') {
+        RESQ.playChime();
+        const hospName = msg.data?.hospital_name || 'Destination Hospital';
+        RESQ.toast('Hospital Confirmed', `✅ ${hospName} has accepted your emergency request! Mobilizing nearest ambulance.`, 'emerald');
+        updateHospitalBanner(true, hospName);
+        checkActiveEmergency();
+      } else if (msg.event === 'DRIVER_ACCEPTED' || (msg.event === 'STATUS_CHANGE' && msg.data?.status === 'DRIVER_ACCEPTED')) {
+        RESQ.playChime();
+        const vNum = msg.data?.ambulance?.vehicle_number || 'Unit';
+        RESQ.toast('Ambulance Assigned', `🚑 Driver accepted your request (${vNum}). En route to your location.`, 'blue');
+        checkActiveEmergency();
       } else if (msg.event === 'STATUS_CHANGE' || msg.event === 'EMERGENCY_STATUS_UPDATED') {
         const newStatus = msg.data?.status;
         if (newStatus === 'CANCELLED' || (activeEmergency && msg.data?.emergency_id === activeEmergency.id && newStatus === 'CANCELLED')) {
           renderStandbyState();
           RESQ.toast('Emergency Cancelled', 'Distress request has been aborted', 'amber');
+        } else if (newStatus === 'PATIENT_ONBOARD' || newStatus === 'EN_ROUTE_TO_HOSPITAL') {
+          RESQ.toast('Patient Loaded', 'Ambulance is now proceeding to the selected hospital', 'emerald');
+          checkActiveEmergency();
+        } else if (newStatus === 'CASE_COMPLETED' || newStatus === 'HANDOVER_COMPLETE') {
+          RESQ.toast('Admitted to Hospital', 'Clinical handover complete at hospital ER', 'emerald');
+          checkActiveEmergency();
         } else if (activeEmergency) {
           activeEmergency.status = newStatus;
           updateHUD(activeEmergency);
@@ -381,23 +454,68 @@
     }
 
     // Render hospital marker
-    if (emergency.hospital && emergency.hospital.latitude && !hospitalMarker) {
-      hospitalMarker = L.marker([emergency.hospital.latitude, emergency.hospital.longitude], {
-        icon: RESQ_MAP.createHospitalIcon(emergency.hospital, true)
+    const hosp = emergency.selected_hospital || emergency.hospital;
+    if (hosp && hosp.latitude && !hospitalMarker) {
+      hospitalMarker = L.marker([hosp.latitude, hosp.longitude], {
+        icon: RESQ_MAP.createHospitalIcon(hosp, true)
       }).addTo(citizenMap);
-      document.getElementById('hosp-name-text').textContent = emergency.hospital.name;
-      document.getElementById('hosp-icu-text').textContent = `ICU Beds Available: ${emergency.hospital.icu_beds_available || 5}`;
+      document.getElementById('hosp-name-text').textContent = hosp.name;
+      document.getElementById('hosp-icu-text').textContent = `ICU Beds Available: ${hosp.icu_beds_available ?? 6} &bull; ER Status: Normal`;
     }
 
     // Render ambulance marker
-    const amb = emergency.ambulance;
+    const amb = emergency.assigned_ambulance || emergency.ambulance;
     if (amb) {
       const aLat = amb.current_latitude || amb.current_lat || pLat + 0.008;
       const aLng = amb.current_longitude || amb.current_lng || pLng - 0.008;
-      updateAmbulancePosition(aLat, aLng, amb.current_heading || 45, 45);
+      updateAmbulancePosition(aLat, aLng, amb.current_heading || amb.heading || 45, 45);
 
       document.getElementById('amb-reg-text').textContent = amb.vehicle_number || 'TN-09-EM-1001';
       document.getElementById('amb-type-badge').textContent = amb.ambulance_type || 'ALS';
+      if (amb.driver) {
+        document.getElementById('amb-driver-text').textContent = `Driver: ${amb.driver.full_name || 'Rajesh Kumar'} (Paramedic)`;
+      }
+    }
+
+    // Update Hospital banner status
+    const isAccepted = emergency.status !== 'SEARCHING_AMBULANCE' && emergency.status !== 'REQUESTED';
+    updateHospitalBanner(isAccepted, hosp?.name || 'Trauma Center');
+  }
+
+  function updateHospitalBanner(isAccepted, hospitalName) {
+    const banner = document.getElementById('hud-hospital-banner');
+    const title = document.getElementById('hud-hosp-title');
+    const sub = document.getElementById('hud-hosp-sub');
+    const badge = document.getElementById('hud-hosp-badge');
+    const icon = document.getElementById('hud-hosp-icon');
+    const pill = document.getElementById('hosp-status-pill');
+
+    if (isAccepted) {
+      banner.style.background = 'rgba(16, 185, 129, 0.12)';
+      banner.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+      icon.textContent = '✅';
+      title.textContent = `Admission Confirmed by ${hospitalName}`;
+      title.style.color = '#34D399';
+      sub.textContent = 'Hospital ER team alerted. Trauma bay and bed reserved for arrival.';
+      badge.className = 'badge badge-emerald';
+      badge.textContent = 'FACILITY ACCEPTED';
+      if (pill) {
+        pill.className = 'badge badge-emerald';
+        pill.textContent = 'ACCEPTED';
+      }
+    } else {
+      banner.style.background = 'rgba(245, 158, 11, 0.12)';
+      banner.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+      icon.textContent = '📡';
+      title.textContent = `Inbound Alert Sent to ${hospitalName}`;
+      title.style.color = '#FCD34D';
+      sub.textContent = 'Awaiting clinical triage confirmation from hospital emergency staff...';
+      badge.className = 'badge badge-amber';
+      badge.textContent = 'AWAITING ACCEPTANCE';
+      if (pill) {
+        pill.className = 'badge badge-amber';
+        pill.textContent = 'PENDING';
+      }
     }
   }
 
@@ -445,13 +563,91 @@
     }
 
     // Auto pan gently
-    if (activeEmergency && activeEmergency.status !== 'HANDOVER_COMPLETE') {
+    if (activeEmergency && activeEmergency.status !== 'HANDOVER_COMPLETE' && activeEmergency.status !== 'CASE_COMPLETED') {
       citizenMap.panTo([lat, lng], { animate: true, duration: 1.2 });
     }
   }
 
-  async function submitEmergencySOS(e) {
+  // --- Hospital Selection & Emergency Creation ---
+
+  async function promptHospitalSelection(e) {
     e.preventDefault();
+    const lat = parseFloat(document.getElementById('sos-lat').value);
+    const lng = parseFloat(document.getElementById('sos-lng').value);
+    const type = document.getElementById('sos-type').value;
+
+    const modal = document.getElementById('hospital-select-modal');
+    const loading = document.getElementById('hospital-loading-state');
+    const container = document.getElementById('hospital-cards-container');
+
+    modal.style.display = 'flex';
+    loading.style.display = 'flex';
+    container.innerHTML = '';
+
+    try {
+      const res = await fetch(`/api/v1/hospitals/recommendations?lat=${lat}&lng=${lng}&emergency_type=${encodeURIComponent(type)}`);
+      if (!res.ok) throw new Error('Failed to fetch hospital recommendations');
+      const recs = await res.json();
+      renderHospitalCards(recs);
+    } catch (err) {
+      container.innerHTML = `
+        <div style="padding: 24px; text-align: center; color: #F87171;">
+          <div style="font-size: 1.2rem; margin-bottom: 6px;">⚠️ Unable to load hospitals</div>
+          <div style="font-size: 0.85rem; color: #94A3B8;">${err.message}</div>
+          <button onclick="promptHospitalSelection(event)" class="btn btn-outline btn-sm" style="margin-top: 14px;">Retry</button>
+        </div>
+      `;
+    } finally {
+      loading.style.display = 'none';
+    }
+  }
+
+  function renderHospitalCards(recs) {
+    const container = document.getElementById('hospital-cards-container');
+    if (!recs || recs.length === 0) {
+      container.innerHTML = `<div style="text-align:center; padding:30px; color:#94A3B8;">No nearby emergency hospitals found.</div>`;
+      return;
+    }
+
+    container.innerHTML = recs.map((h, idx) => {
+      const isTop = idx === 0;
+      return `
+        <div class="hosp-rec-card" style="${isTop ? 'border-color: rgba(56, 189, 248, 0.4); background: rgba(14, 165, 233, 0.06);' : ''}">
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <span style="font-size: 1.05rem; font-weight: 700; color: #FFF;">${h.name}</span>
+              ${isTop ? '<span class="badge badge-emerald" style="font-size: 0.68rem;">⭐ CLOSEST ER</span>' : ''}
+              <span class="badge badge-blue" style="font-size: 0.68rem;">${(h.distance_km || 2.4).toFixed(1)} km &bull; ~${(h.eta_minutes || 6).toFixed(0)} min</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #94A3B8;">${h.address || 'Chennai Emergency Care District'}</div>
+            
+            <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px; flex-wrap: wrap;">
+              <span class="badge badge-amber" style="font-size: 0.7rem;">🛏️ ICU Beds: ${h.icu_beds_available ?? 6}</span>
+              <span class="badge badge-emerald" style="font-size: 0.7rem;">🏥 General Beds: ${h.general_beds_available ?? 18}</span>
+              <span class="badge badge-blue" style="font-size: 0.7rem;">🫁 Vents: ${h.ventilators_available ?? 4}</span>
+            </div>
+          </div>
+
+          <div>
+            <button onclick="selectHospitalAndDispatch(${h.hospital_id}, '${escapeQuotes(h.name)}')" class="btn btn-primary" style="padding: 10px 16px; font-size: 0.85rem; font-weight: 700; white-space: nowrap;">
+              <span>🚑 Select &amp; Request Care</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function escapeQuotes(str) {
+    return (str || '').replace(/'/g, "\\'");
+  }
+
+  function closeHospitalModal() {
+    document.getElementById('hospital-select-modal').style.display = 'none';
+  }
+
+  async function selectHospitalAndDispatch(hospitalId, hospitalName) {
+    closeHospitalModal();
     const submitBtn = document.getElementById('sos-submit-btn');
     submitBtn.disabled = true;
 
@@ -459,9 +655,11 @@
       emergency_type: document.getElementById('sos-type').value,
       priority: document.getElementById('sos-priority').value,
       pickup_address: document.getElementById('sos-address').value,
-      pickup_latitude: parseFloat(document.getElementById('sos-lat').value),
-      pickup_longitude: parseFloat(document.getElementById('sos-lng').value),
-      contact_phone: document.getElementById('sos-phone').value,
+      pickup_lat: parseFloat(document.getElementById('sos-lat').value),
+      pickup_lng: parseFloat(document.getElementById('sos-lng').value),
+      contact_number: document.getElementById('sos-phone').value,
+      selected_hospital_id: hospitalId,
+      preferred_hospital: hospitalName,
     };
 
     try {
@@ -473,8 +671,8 @@
       if (res.ok) {
         const data = await res.json();
         RESQ.playChime();
-        RESQ.toast('🚨 Emergency Distress Transmitted', 'ALS ambulance assigned & en route', 'emerald');
-        checkActiveEmergency();
+        RESQ.toast('Inbound Request Dispatched', `Inbound request sent to ${hospitalName}. Waiting for facility acceptance.`, 'emerald');
+        await checkActiveEmergency();
       } else {
         const err = await res.json();
         RESQ.toast('SOS Failed', err.detail || 'Could not create emergency', 'crimson');

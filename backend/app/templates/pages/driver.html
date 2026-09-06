@@ -43,6 +43,9 @@
           <div id="incoming-incident-desc" style="font-size: 0.88rem; color: #FCA5A5; margin-top: 2px;">
             Cardiac arrest at 41, Potheri SRM University Campus
           </div>
+          <div id="incoming-hospital-desc" style="font-size: 0.82rem; color: #67E8F9; margin-top: 3px;">
+            Target Hospital: Apollo Hospital - Trauma Center
+          </div>
         </div>
       </div>
 
@@ -64,6 +67,9 @@
         <div style="font-size: 0.78rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em;">Current Mission Phase</div>
         <div id="driver-phase-text" style="font-size: 1.4rem; font-weight: 800; color: #FFF; font-family: var(--font-heading);">
           STANDBY &bull; READY FOR DISPATCH
+        </div>
+        <div id="driver-nav-instruction" style="font-size: 0.85rem; color: var(--cyan-400); margin-top: 4px; display: none;">
+          📍 Directing navigation to: <strong id="nav-target-name">Patient Pickup</strong>
         </div>
       </div>
 
@@ -93,7 +99,7 @@
         <div id="drv-phone" style="font-weight: 700; color: var(--cyan-400); margin-top: 2px;">+91 98765 43210</div>
       </div>
       <div>
-        <div style="font-size: 0.75rem; color: #94A3B8;">TARGET HOSPITAL ER</div>
+        <div style="font-size: 0.75rem; color: #94A3B8;">CITIZEN SELECTED HOSPITAL</div>
         <div id="drv-hospital" style="font-weight: 700; color: #10B981; margin-top: 2px;">Apollo Trauma Center</div>
       </div>
     </div>
@@ -101,6 +107,47 @@
     <!-- Driver Tactical Map -->
     <div style="position: relative; height: 460px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1);">
       <div id="driver-cockpit-map" style="width: 100%; height: 100%;"></div>
+    </div>
+  </div>
+
+  <!-- Patient Pickup Confirmation Pop-up Modal -->
+  <div id="pickup-confirm-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 20px;">
+    <div class="glass-panel" style="max-width: 520px; width: 100%; padding: 28px; display: flex; flex-direction: column; gap: 18px; border: 2px solid var(--cyan-400); box-shadow: 0 0 35px rgba(6, 182, 212, 0.35);">
+      <div style="display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 14px;">
+        <div style="width: 46px; height: 46px; border-radius: 10px; background: rgba(6, 182, 212, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">
+          🚑
+        </div>
+        <div>
+          <h3 style="font-size: 1.25rem; color: #FFF; margin: 0;">Confirm Patient Pickup</h3>
+          <div style="font-size: 0.8rem; color: var(--cyan-400);">Mobile ICU Transfer &amp; Hospital Transit</div>
+        </div>
+      </div>
+
+      <div style="background: rgba(13, 19, 34, 0.7); padding: 16px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem;">
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #94A3B8;">Patient:</span>
+          <strong id="popup-patient-name" style="color: #FFF;">Alex Johnson</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #94A3B8;">Emergency Type:</span>
+          <strong id="popup-patient-condition" style="color: #F87171;">Cardiac / Critical</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #94A3B8;">Citizen Selected Hospital:</span>
+          <strong id="popup-target-hospital" style="color: #34D399;">Apollo Trauma Center</strong>
+        </div>
+      </div>
+
+      <p style="font-size: 0.84rem; color: #CBD5E1; line-height: 1.5; margin: 0;">
+        Confirm the patient is safely loaded onboard? The app will direct navigation straight to the hospital selected by the patient.
+      </p>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px;">
+        <button type="button" onclick="closePickupModal()" class="btn btn-outline" style="padding: 10px 18px;">Cancel</button>
+        <button type="button" onclick="confirmPatientPickup()" class="btn btn-primary" style="padding: 10px 22px; font-weight: 800;">
+          <span>✅ Confirm Pickup &amp; Direct to Hospital</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -139,6 +186,7 @@
   let activeEmergency = null;
   let driverMarker = null;
   let targetMarker = null;
+  let navPolyline = null;
   let isOnDuty = true;
 
   document.addEventListener('DOMContentLoaded', async () => {
@@ -173,6 +221,8 @@
           RESQ.toast('Mission Cancelled', 'Emergency dispatch call was aborted', 'amber');
           activeEmergency = null;
           renderStandby();
+        } else if (newStatus === 'HOSPITAL_ACCEPTED') {
+          RESQ.toast('Hospital Confirmed', 'Destination hospital accepted inbound patient', 'emerald');
         }
         fetchDriverState();
       } else if (msg.event === 'SIMULATION_STARTED') {
@@ -233,6 +283,8 @@
   function renderIncomingAlert(data) {
     document.getElementById('dispatch-alert-banner').style.display = 'block';
     document.getElementById('incoming-incident-desc').textContent = `${data.emergency_type || 'Emergency'} at ${data.pickup_address || 'Patient Coordinates'}`;
+    const hosp = data.hospital || data.selected_hospital || data.destination_hospital;
+    document.getElementById('incoming-hospital-desc').textContent = `Target Hospital: ${hosp?.name || 'Apollo Hospital - Trauma Center'}`;
   }
 
   function renderStandby() {
@@ -240,11 +292,16 @@
     document.getElementById('driver-incident-strip').style.display = 'none';
     document.getElementById('mission-action-btn').style.display = 'none';
     document.getElementById('diversion-trigger-btn').style.display = 'none';
+    document.getElementById('driver-nav-instruction').style.display = 'none';
     document.getElementById('driver-phase-text').textContent = 'STANDBY • READY FOR DISPATCH';
     document.getElementById('driver-phase-text').style.color = '#94A3B8';
     if (targetMarker) {
       driverMap.removeLayer(targetMarker);
       targetMarker = null;
+    }
+    if (navPolyline) {
+      driverMap.removeLayer(navPolyline);
+      navPolyline = null;
     }
   }
 
@@ -253,7 +310,9 @@
     document.getElementById('drv-type').textContent = em.emergency_type || 'Cardiac Emergency';
     document.getElementById('drv-pickup').textContent = em.pickup_address || 'Potheri, Chennai';
     document.getElementById('drv-phone').textContent = em.contact_phone || '+91 98765 43210';
-    document.getElementById('drv-hospital').textContent = em.hospital?.name || 'Apollo Trauma Center';
+
+    const hosp = em.selected_hospital || em.hospital;
+    document.getElementById('drv-hospital').textContent = hosp?.name || 'Apollo Trauma Center';
 
     const status = em.status || 'ASSIGNED';
     document.getElementById('driver-phase-text').textContent = status.replace(/_/g, ' ');
@@ -262,39 +321,93 @@
     const actionBtn = document.getElementById('mission-action-btn');
     const label = document.getElementById('mission-action-label');
     const divBtn = document.getElementById('diversion-trigger-btn');
+    const navInstruction = document.getElementById('driver-nav-instruction');
+    const navTarget = document.getElementById('nav-target-name');
 
     actionBtn.style.display = 'inline-flex';
 
-    if (status === 'ASSIGNED' || status === 'AMBULANCE_ASSIGNED') {
+    const pLat = em.pickup_lat ?? em.pickup_latitude ?? 12.8235;
+    const pLng = em.pickup_lng ?? em.pickup_longitude ?? 80.0445;
+
+    if (status === 'ASSIGNED' || status === 'AMBULANCE_ASSIGNED' || status === 'SEARCHING_AMBULANCE') {
       renderIncomingAlert(em);
       label.textContent = 'Accept Dispatch';
       divBtn.style.display = 'none';
+      navInstruction.style.display = 'none';
     } else if (status === 'DRIVER_ACCEPTED' || status === 'ACCEPTED') {
       document.getElementById('dispatch-alert-banner').style.display = 'none';
       label.textContent = 'Start Navigation to Patient';
       divBtn.style.display = 'none';
+      navInstruction.style.display = 'block';
+      navTarget.textContent = `Patient Pickup: ${em.pickup_address || 'Patient Coordinates'}`;
+      drawRouteTo(pLat, pLng, 'Patient Pickup', false);
     } else if (status === 'AMBULANCE_EN_ROUTE' || status === 'EN_ROUTE_TO_PICKUP') {
       document.getElementById('dispatch-alert-banner').style.display = 'none';
       label.textContent = 'Confirm Arrived at Scene';
       divBtn.style.display = 'none';
+      navInstruction.style.display = 'block';
+      navTarget.textContent = `Patient Pickup: ${em.pickup_address || 'Patient Coordinates'}`;
+      drawRouteTo(pLat, pLng, 'Patient Pickup', false);
     } else if (status === 'ARRIVED_AT_SCENE' || status === 'ARRIVED_AT_PICKUP') {
-      label.textContent = 'Confirm Patient Loaded';
+      label.textContent = 'Confirm Patient Pickup';
       divBtn.style.display = 'none';
+      navInstruction.style.display = 'block';
+      navTarget.textContent = `Patient Loaded at Scene &bull; Destination: ${hosp?.name || 'Hospital'}`;
     } else if (status === 'PATIENT_LOADED' || status === 'PATIENT_ONBOARD') {
       label.textContent = 'Start Transit to Hospital ER';
       divBtn.style.display = 'inline-flex';
+      navInstruction.style.display = 'block';
+      navTarget.textContent = `Destination Hospital: ${hosp?.name || 'Trauma Center'}`;
+      if (hosp && hosp.latitude) {
+        drawRouteTo(hosp.latitude, hosp.longitude, hosp.name, true);
+      }
     } else if (status === 'IN_TRANSIT_TO_HOSPITAL' || status === 'EN_ROUTE_TO_HOSPITAL') {
       label.textContent = 'Confirm Arrived at Hospital ER';
       divBtn.style.display = 'inline-flex';
+      navInstruction.style.display = 'block';
+      navTarget.textContent = `Directing Route to: ${hosp?.name || 'Trauma Center'}`;
+      if (hosp && hosp.latitude) {
+        drawRouteTo(hosp.latitude, hosp.longitude, hosp.name, true);
+      }
     } else if (status === 'ARRIVED_AT_HOSPITAL') {
       label.textContent = 'Complete ER Handover';
       divBtn.style.display = 'none';
-    } else if (status === 'HANDOVER_COMPLETE') {
+      navInstruction.style.display = 'block';
+      navTarget.textContent = `At ER Entrance &bull; ${hosp?.name || 'Hospital'}`;
+    } else if (status === 'HANDOVER_COMPLETE' || status === 'CASE_COMPLETED') {
       actionBtn.style.display = 'none';
       divBtn.style.display = 'none';
+      navInstruction.style.display = 'none';
       document.getElementById('driver-phase-text').textContent = 'MISSION COMPLETE • RETURNING TO BASE';
       document.getElementById('driver-phase-text').style.color = '#10B981';
+      if (targetMarker) driverMap.removeLayer(targetMarker);
+      if (navPolyline) driverMap.removeLayer(navPolyline);
     }
+  }
+
+  function drawRouteTo(destLat, destLng, title, isHospital = false) {
+    if (!driverMap) return;
+
+    if (targetMarker) driverMap.removeLayer(targetMarker);
+    if (navPolyline) driverMap.removeLayer(navPolyline);
+
+    const icon = isHospital 
+      ? RESQ_MAP.createHospitalIcon({ name: title }, true)
+      : RESQ_MAP.createPickupIcon(title);
+
+    targetMarker = L.marker([destLat, destLng], { icon: icon }).addTo(driverMap);
+
+    const curLat = driverAmbulance?.current_latitude || driverAmbulance?.current_lat || 12.8235;
+    const curLng = driverAmbulance?.current_longitude || driverAmbulance?.current_lng || 80.0445;
+
+    navPolyline = L.polyline([[curLat, curLng], [destLat, destLng]], {
+      color: isHospital ? '#10B981' : '#38BDF8',
+      weight: 5,
+      opacity: 0.85,
+      dashArray: '8, 8'
+    }).addTo(driverMap);
+
+    driverMap.fitBounds([[curLat, curLng], [destLat, destLng]], { padding: [40, 40] });
   }
 
   async function advanceMissionStage() {
@@ -302,7 +415,7 @@
     const status = activeEmergency.status;
     let nextStatus = '';
 
-    if (status === 'ASSIGNED' || status === 'AMBULANCE_ASSIGNED') {
+    if (status === 'ASSIGNED' || status === 'AMBULANCE_ASSIGNED' || status === 'SEARCHING_AMBULANCE') {
       await acceptDispatch();
       return;
     } else if (status === 'DRIVER_ACCEPTED' || status === 'ACCEPTED') {
@@ -310,7 +423,9 @@
     } else if (status === 'AMBULANCE_EN_ROUTE' || status === 'EN_ROUTE_TO_PICKUP') {
       nextStatus = 'ARRIVED_AT_SCENE';
     } else if (status === 'ARRIVED_AT_SCENE' || status === 'ARRIVED_AT_PICKUP') {
-      nextStatus = 'PATIENT_LOADED';
+      // Open the Pickup Confirmation Pop-up modal!
+      openPickupConfirmationModal();
+      return;
     } else if (status === 'PATIENT_LOADED' || status === 'PATIENT_ONBOARD') {
       nextStatus = 'IN_TRANSIT_TO_HOSPITAL';
     } else if (status === 'IN_TRANSIT_TO_HOSPITAL' || status === 'EN_ROUTE_TO_HOSPITAL') {
@@ -334,6 +449,40 @@
       } catch (e) {
         RESQ.toast('Error', e.message, 'crimson');
       }
+    }
+  }
+
+  function openPickupConfirmationModal() {
+    if (!activeEmergency) return;
+    document.getElementById('popup-patient-name').textContent = activeEmergency.patient_name || 'Patient';
+    document.getElementById('popup-patient-condition').textContent = `${activeEmergency.priority || 'CRITICAL'} - ${activeEmergency.emergency_type || 'Emergency'}`;
+    const hosp = activeEmergency.selected_hospital || activeEmergency.hospital;
+    document.getElementById('popup-target-hospital').textContent = hosp?.name || 'Apollo Trauma Center';
+    document.getElementById('pickup-confirm-modal').style.display = 'flex';
+  }
+
+  function closePickupModal() {
+    document.getElementById('pickup-confirm-modal').style.display = 'none';
+  }
+
+  async function confirmPatientPickup() {
+    closePickupModal();
+    if (!activeEmergency) return;
+
+    try {
+      const res = await fetch(`/api/v1/emergencies/${activeEmergency.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'PATIENT_LOADED' })
+      });
+      if (res.ok) {
+        RESQ.playChime();
+        const hosp = activeEmergency.selected_hospital || activeEmergency.hospital;
+        RESQ.toast('Patient Onboard', `Routing to ${hosp?.name || 'hospital'}`, 'emerald');
+        await fetchDriverState();
+      }
+    } catch (e) {
+      RESQ.toast('Error', e.message, 'crimson');
     }
   }
 

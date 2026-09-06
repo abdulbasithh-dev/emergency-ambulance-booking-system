@@ -1,5 +1,6 @@
 from typing import List, Optional
 from datetime import datetime, timezone
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
@@ -15,6 +16,7 @@ from app.models.enums import (
     HospitalCaseStatus,
     ChangeRequestStatus,
     EmergencyType,
+    EmergencyStatus,
     UserRole,
 )
 from app.schemas.hospital import (
@@ -245,11 +247,48 @@ async def handle_hospital_case_action(
             "hospital_id": hosp.id,
             "hospital_name": hosp.name,
             "status": "ACCEPTED",
+            "message": f"{hosp.name} has accepted your emergency request! Dispatching closest ambulance...",
         }
         await manager.send_to_user(emergency.user_id, "HOSPITAL_ACCEPTED_CASE", msg)
+        await manager.send_to_user(emergency.user_id, "STATUS_CHANGE", {
+            "emergency_id": emergency.id,
+            "status": "HOSPITAL_ACCEPTED",
+            "hospital_name": hosp.name,
+        })
         if emergency.assigned_ambulance and emergency.assigned_ambulance.driver_id:
             await manager.send_to_driver(emergency.assigned_ambulance.driver_id, "HOSPITAL_ACCEPTED_CASE", msg)
         await manager.send_to_dispatchers("HOSPITAL_ACCEPTED_CASE", msg)
+
+        # Alert the assigned driver or broadcast dispatch offer
+        if emergency.assigned_ambulance:
+            dispatch_msg = {
+                "id": emergency.id,
+                "emergency_id": emergency.id,
+                "ambulance_id": emergency.assigned_ambulance.id,
+                "vehicle_number": emergency.assigned_ambulance.vehicle_number,
+                "patient_name": emergency.patient_name,
+                "emergency_type": emergency.emergency_type.value if hasattr(emergency.emergency_type, "value") else str(emergency.emergency_type),
+                "priority": emergency.priority.value if hasattr(emergency.priority, "value") else str(emergency.priority),
+                "pickup_address": emergency.pickup_address,
+                "pickup_lat": emergency.pickup_lat,
+                "pickup_lng": emergency.pickup_lng,
+                "contact_phone": emergency.contact_number,
+                "hospital": {
+                    "id": hosp.id,
+                    "name": hosp.name,
+                    "address": hosp.address,
+                },
+                "destination_hospital": {
+                    "id": hosp.id,
+                    "name": hosp.name,
+                },
+                "status": emergency.status.value,
+            }
+            if emergency.assigned_ambulance.driver_id:
+                await manager.send_to_driver(emergency.assigned_ambulance.driver_id, "DISPATCH_REQUEST", dispatch_msg)
+                await manager.send_to_driver(emergency.assigned_ambulance.driver_id, "NEW_DISPATCH_OFFER", dispatch_msg)
+            await manager.broadcast_to_drivers("DISPATCH_REQUEST", dispatch_msg)
+            await manager.broadcast_to_drivers("NEW_DISPATCH_OFFER", dispatch_msg)
 
         return {"status": "accepted", "message": f"{hosp.name} confirmed acceptance"}
 
@@ -293,6 +332,52 @@ async def handle_hospital_case_action(
             "message": "Hospital case rejected. Alternative hospital recommendations dispatched.",
             "alternatives": alternatives,
         }
+
+class HandoverPayload(BaseModel):
+    doctor_name: Optional[str] = "Dr. Ananya Roy (ER Lead)"
+    notes: Optional[str] = "Patient transferred to ER trauma care team"
+
+@router.post("/handover/{emergency_id}")
+async def confirm_patient_handover(
+    emergency_id: int,
+    payload: Optional[HandoverPayload] = None,
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Hospital confirms clinical handover of arrived patient, completing emergency."""
+    emergency = await EmergencyService.get_emergency_by_id(db, emergency_id)
+    if not emergency:
+        raise HTTPException(status_code=404, detail="Emergency not found")
+
+    doctor = payload.doctor_name if payload and payload.doctor_name else "ER Lead Physician"
+    notes = payload.notes if payload and payload.notes else f"Patient handed over to {doctor}"
+
+    client_ip = request.client.host if request and request.client else None
+    updated = await EmergencyService.update_status(
+        db=db,
+        emergency_id=emergency_id,
+        new_status=EmergencyStatus.CASE_COMPLETED,
+        changed_by_user_id=current_user.id,
+        notes=notes,
+        client_ip=client_ip,
+    )
+
+    handover_data = {
+        "emergency_id": emergency_id,
+        "status": "CASE_COMPLETED",
+        "doctor_name": doctor,
+        "message": f"Clinical handover completed by {doctor}. Patient admitted to ER.",
+    }
+    await manager.send_to_user(emergency.user_id, "HANDOVER_COMPLETE", handover_data)
+    await manager.send_to_user(emergency.user_id, "STATUS_CHANGE", handover_data)
+    if emergency.assigned_ambulance and emergency.assigned_ambulance.driver_id:
+        await manager.send_to_driver(emergency.assigned_ambulance.driver_id, "HANDOVER_COMPLETE", handover_data)
+        await manager.send_to_driver(emergency.assigned_ambulance.driver_id, "STATUS_CHANGE", handover_data)
+    await manager.send_to_dispatchers("HANDOVER_COMPLETE", handover_data)
+    await manager.send_to_dispatchers("STATUS_CHANGE", handover_data)
+
+    return {"status": "success", "emergency_id": emergency_id, "message": handover_data["message"]}
 
 @router.post("/change-request", response_model=HospitalChangeRequestResponse)
 async def request_hospital_change(

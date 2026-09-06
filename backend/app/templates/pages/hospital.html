@@ -13,7 +13,7 @@
       </div>
       <div>
         <h1 style="font-size: 1.35rem; color: #FFF; margin: 0;">Emergency Trauma Center &bull; ER Cockpit</h1>
-        <div style="font-size: 0.8rem; color: #94A3B8;">Real-time Inbound Telemetry &bull; ICU Bed &amp; Ventilator Capacity Management</div>
+        <div style="font-size: 0.8rem; color: #94A3B8;">Real-time Inbound Telemetry &bull; Inbound Patient Acceptance &bull; Bed Capacity</div>
       </div>
     </div>
 
@@ -108,10 +108,31 @@
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <div>
         <h2 style="font-size: 1.2rem; color: #FFF; margin: 0; display: flex; align-items: center; gap: 8px;">
-          <span>🚨 Inbound Trauma Cases &amp; Patient Handover</span>
+          <span>🚨 Inbound Trauma Cases &amp; Patient Admission</span>
           <span id="inbound-count-badge" class="badge badge-crimson">0 Inbound</span>
         </h2>
-        <div style="font-size: 0.8rem; color: #94A3B8;">Real-time GPS telemetry from approaching emergency ambulances.</div>
+        <div style="font-size: 0.8rem; color: #94A3B8;">Review inbound requests selected by citizens and confirm clinical handover upon arrival.</div>
+      </div>
+    </div>
+
+    <!-- New Case Alert Banner (Pulsing when new unaccepted inbound request exists) -->
+    <div id="new-case-alert-banner" class="glass-panel-glow" style="display: none; padding: 16px 20px; background: rgba(239, 68, 68, 0.15); border: 1px solid #EF4444; border-radius: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span class="pulsing-dot" style="width: 12px; height: 12px;"></span>
+          <div>
+            <div style="font-size: 1rem; font-weight: 700; color: #FFF;">🚨 INBOUND PATIENT ADMISSION REQUEST PENDING!</div>
+            <div id="new-case-alert-text" style="font-size: 0.82rem; color: #FCA5A5; margin-top: 2px;">
+              Citizen emergency request awaiting ER admission confirmation.
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button id="banner-accept-btn" class="btn btn-primary btn-sm" style="font-weight: 800; padding: 8px 18px;">
+            <span>✅ Accept Inbound Request</span>
+          </button>
+          <button onclick="dismissCaseAlert()" class="btn btn-outline btn-sm">Dismiss</button>
+        </div>
       </div>
     </div>
 
@@ -122,9 +143,9 @@
             <th style="padding: 12px 14px;">Incident Details</th>
             <th style="padding: 12px 14px;">Priority</th>
             <th style="padding: 12px 14px;">Assigned Unit</th>
-            <th style="padding: 12px 14px;">ETA</th>
+            <th style="padding: 12px 14px;">Status / ETA</th>
             <th style="padding: 12px 14px;">Assigned ER Doctor</th>
-            <th style="padding: 12px 14px; text-align: right;">Handover Action</th>
+            <th style="padding: 12px 14px; text-align: right;">Action</th>
           </tr>
         </thead>
         <tbody id="inbound-cases-tbody">
@@ -152,14 +173,20 @@
     // Listen to WebSocket events
     window.addEventListener('resq:msg', (e) => {
       const msg = e.detail;
-      if (msg && (
+      if (!msg) return;
+      if (
         msg.event === 'NEW_INBOUND_AMBULANCE' ||
+        msg.event === 'INBOUND_CASE_REQUEST' ||
         msg.event === 'CAPACITY_UPDATED' ||
         msg.event === 'SIMULATION_STARTED' ||
         msg.event === 'SIMULATION_ENDED' ||
         msg.event === 'STATUS_CHANGE' ||
         msg.event === 'EMERGENCY_STATUS_UPDATED'
-      )) {
+      ) {
+        if (msg.event === 'NEW_INBOUND_AMBULANCE' || msg.event === 'INBOUND_CASE_REQUEST') {
+          RESQ.playChime();
+          RESQ.toast('Inbound Emergency Request', 'Citizen requested admission to your trauma center', 'crimson');
+        }
         if (currentHospital) loadHospitalData(currentHospital.id);
       }
     });
@@ -186,7 +213,7 @@
   }
 
   function changeHospital(hospId) {
-    const found = hospitals.find(h => h.id === hospId);
+    const found = hospitals.find(h => h.id == hospId);
     if (found) {
       currentHospital = found;
       loadHospitalData(found.id);
@@ -204,7 +231,7 @@
       document.getElementById('count-icu').textContent = hRes.icu_beds_available ?? 5;
       document.getElementById('count-general').textContent = hRes.general_beds_available ?? 18;
       document.getElementById('count-vent').textContent = hRes.ventilators_available ?? 4;
-      document.getElementById('status-select').value = hRes.emergency_department_status || 'NORMAL';
+      document.getElementById('status-select').value = hRes.emergency_dept_status || 'NORMAL';
 
       renderInboundCases(casesRes || []);
     } catch (e) {
@@ -228,7 +255,7 @@
       icu_beds_available: parseInt(document.getElementById('count-icu').textContent, 10),
       general_beds_available: parseInt(document.getElementById('count-general').textContent, 10),
       ventilators_available: parseInt(document.getElementById('count-vent').textContent, 10),
-      status: document.getElementById('status-select').value,
+      emergency_dept_status: document.getElementById('status-select').value,
     };
 
     try {
@@ -251,8 +278,22 @@
   function renderInboundCases(cases) {
     const tbody = document.getElementById('inbound-cases-tbody');
     const countBadge = document.getElementById('inbound-count-badge');
+    const alertBanner = document.getElementById('new-case-alert-banner');
+    const alertText = document.getElementById('new-case-alert-text');
+    const bannerAcceptBtn = document.getElementById('banner-accept-btn');
+
     const inbound = (cases || []).filter(c => c.status !== 'CASE_COMPLETED' && c.status !== 'CANCELLED');
     countBadge.textContent = `${inbound.length} Inbound`;
+
+    // Check for pending acceptance requests
+    const pendingCase = inbound.find(c => c.status === 'SEARCHING_AMBULANCE' || c.status === 'REQUESTED' || c.status === 'NOTIFIED');
+    if (pendingCase) {
+      alertBanner.style.display = 'block';
+      alertText.textContent = `Patient: ${pendingCase.patient_name || 'Citizen'} (${pendingCase.emergency_type || 'Emergency'}) at ${pendingCase.pickup_address || 'Coordinates'}`;
+      bannerAcceptBtn.onclick = () => acceptHospitalCase(pendingCase.id);
+    } else {
+      alertBanner.style.display = 'none';
+    }
 
     if (inbound.length === 0) {
       tbody.innerHTML = `
@@ -265,36 +306,80 @@
       return;
     }
 
-    tbody.innerHTML = inbound.map(c => `
-      <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
-        <td style="padding: 14px;">
-          <div style="font-weight: 700; color: #FFF;">${c.emergency_type || 'Cardiac Emergency'}</div>
-          <div style="font-size: 0.78rem; color: #94A3B8;">${c.pickup_address || 'Potheri, Chennai'}</div>
-        </td>
-        <td style="padding: 14px;">
-          <span class="badge badge-crimson">${c.priority || 'CRITICAL'}</span>
-        </td>
-        <td style="padding: 14px;">
-          <div style="font-weight: 700; color: #FFF;">${c.ambulance?.vehicle_number || 'TN-09-EM-1001'}</div>
-          <div style="font-size: 0.78rem; color: var(--cyan-400);">${c.ambulance?.ambulance_type || 'ALS ICU'}</div>
-        </td>
-        <td style="padding: 14px;">
-          <strong style="color: var(--cyan-400); font-family: var(--font-mono); font-size: 1rem;">~3 min</strong>
-        </td>
-        <td style="padding: 14px;">
-          <select class="input-field" style="font-size: 0.82rem; padding: 4px 8px; width: 160px;">
-            <option>Dr. Ananya Roy (ER Lead)</option>
-            <option>Dr. Vikram Patel (Trauma)</option>
-            <option>Dr. Rajesh Shenoy (Cardio)</option>
-          </select>
-        </td>
-        <td style="padding: 14px; text-align: right;">
-          <button onclick="confirmHandover('${c.id}')" class="btn btn-emerald btn-sm">
+    tbody.innerHTML = inbound.map(c => {
+      const isPending = c.status === 'SEARCHING_AMBULANCE' || c.status === 'REQUESTED' || c.status === 'NOTIFIED';
+      const isArrived = c.status === 'ARRIVED_AT_HOSPITAL';
+
+      let actionBtn = '';
+      if (isPending) {
+        actionBtn = `
+          <button onclick="acceptHospitalCase('${c.id}')" class="btn btn-primary btn-sm" style="font-weight: 700; white-space: nowrap;">
+            <span>✅ Accept Request</span>
+          </button>
+        `;
+      } else if (isArrived) {
+        actionBtn = `
+          <button onclick="confirmHandover('${c.id}')" class="btn btn-emerald btn-sm" style="font-weight: 700; white-space: nowrap;">
             <span>✅ Confirm Handover</span>
           </button>
-        </td>
-      </tr>
-    `).join('');
+        `;
+      } else {
+        actionBtn = `
+          <span class="badge badge-blue" style="font-size: 0.72rem; white-space: nowrap;">EN ROUTE</span>
+        `;
+      }
+
+      return `
+        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
+          <td style="padding: 14px;">
+            <div style="font-weight: 700; color: #FFF;">${c.emergency_type || 'Cardiac Emergency'}</div>
+            <div style="font-size: 0.78rem; color: #94A3B8;">${c.pickup_address || 'Potheri, Chennai'}</div>
+          </td>
+          <td style="padding: 14px;">
+            <span class="badge badge-crimson">${c.priority || 'CRITICAL'}</span>
+          </td>
+          <td style="padding: 14px;">
+            <div style="font-weight: 700; color: #FFF;">${c.assigned_ambulance?.vehicle_number || c.ambulance?.vehicle_number || 'TN-09-EM-1001'}</div>
+            <div style="font-size: 0.78rem; color: var(--cyan-400);">${c.assigned_ambulance?.ambulance_type || c.ambulance?.ambulance_type || 'ALS ICU'}</div>
+          </td>
+          <td style="padding: 14px;">
+            <strong style="color: var(--cyan-400); font-family: var(--font-mono); font-size: 0.95rem;">${isArrived ? 'At ER Bay' : (isPending ? 'Pending Acceptance' : '~3 min')}</strong>
+          </td>
+          <td style="padding: 14px;">
+            <select class="input-field" style="font-size: 0.82rem; padding: 4px 8px; width: 160px;">
+              <option>Dr. Ananya Roy (ER Lead)</option>
+              <option>Dr. Vikram Patel (Trauma)</option>
+              <option>Dr. Rajesh Shenoy (Cardio)</option>
+            </select>
+          </td>
+          <td style="padding: 14px; text-align: right;">
+            ${actionBtn}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function acceptHospitalCase(emergencyId) {
+    if (!currentHospital || !emergencyId) return;
+    try {
+      const res = await fetch(`/api/v1/hospitals/${currentHospital.id}/cases/${emergencyId}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'ACCEPTED' })
+      });
+      if (res.ok) {
+        RESQ.playChime();
+        RESQ.toast('Inbound Case Accepted', 'Notification dispatched to citizen and assigned ambulance driver.', 'emerald');
+        dismissCaseAlert();
+        loadHospitalData(currentHospital.id);
+      } else {
+        const err = await res.json();
+        RESQ.toast('Error', err.detail || 'Could not accept case', 'crimson');
+      }
+    } catch (e) {
+      RESQ.toast('Error', e.message, 'crimson');
+    }
   }
 
   async function confirmHandover(emergencyId) {
@@ -306,12 +391,19 @@
       });
       if (res.ok) {
         RESQ.playChime();
-        RESQ.toast('Handover Complete', 'Patient transferred to ER care team', 'emerald');
+        RESQ.toast('Handover Complete', 'Patient successfully transferred to ER trauma care team', 'emerald');
         if (currentHospital) loadHospitalData(currentHospital.id);
+      } else {
+        const err = await res.json();
+        RESQ.toast('Error', err.detail || 'Handover failed', 'crimson');
       }
     } catch (e) {
       RESQ.toast('Error', e.message, 'crimson');
     }
+  }
+
+  function dismissCaseAlert() {
+    document.getElementById('new-case-alert-banner').style.display = 'none';
   }
 </script>
 {% endblock %}

@@ -337,6 +337,7 @@ class EmergencyService:
         alias_map = {
             EmergencyStatus.AMBULANCE_EN_ROUTE: EmergencyStatus.EN_ROUTE_TO_PICKUP,
             EmergencyStatus.ARRIVED_AT_SCENE: EmergencyStatus.ARRIVED_AT_PICKUP,
+            EmergencyStatus.PATIENT_LOADED: EmergencyStatus.PATIENT_ONBOARD,
             EmergencyStatus.IN_TRANSIT_TO_HOSPITAL: EmergencyStatus.EN_ROUTE_TO_HOSPITAL,
             EmergencyStatus.HANDOVER_COMPLETE: EmergencyStatus.CASE_COMPLETED,
         }

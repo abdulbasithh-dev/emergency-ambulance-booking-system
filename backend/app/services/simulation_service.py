@@ -85,25 +85,84 @@ class SimulationRunner:
                 amb = emergency.assigned_ambulance
                 user_id = emergency.user_id
                 driver_id = amb.driver_id or 1
-                
-                # Step 1: Driver Accepts
+
+                # Step 1: Ensure Hospital is selected and notified
+                best_hosp_id = emergency.selected_hospital_id
+                if not best_hosp_id:
+                    recs = await HospitalRecommendationService.get_recommendations(
+                        db, emergency.pickup_lat, emergency.pickup_lng, emergency.emergency_type
+                    )
+                    best_hosp_id = recs[0].hospital_id if recs else 1
+                    await EmergencyService.select_hospital(
+                        db, emergency_id, best_hosp_id,
+                        selected_by_user_id=user_id,
+                        notes=f"Confirmed destination: {recs[0].name if recs else 'Hospital'}"
+                    )
+                    emergency = await EmergencyService.get_emergency_by_id(db, emergency_id)
+
+                hosp = await db.get(Hospital, best_hosp_id)
+                hospital_name = hosp.name if hosp else "Trauma Center"
+
+                # Step 2: Hospital Accepts Incoming Emergency Request
                 if await is_cancelled_or_stopped():
-                    logger.info(f"Simulation aborted before step 1 for emergency {emergency_id}")
+                    logger.info(f"Simulation aborted before hospital acceptance for emergency {emergency_id}")
+                    return
+                await asyncio.sleep(step_delay)
+
+                # Set hospital case to accepted
+                hosp_case_stmt = select(HospitalCase).where(
+                    HospitalCase.emergency_id == emergency_id,
+                    HospitalCase.hospital_id == best_hosp_id,
+                )
+                hosp_case = (await db.execute(hosp_case_stmt)).scalar_one_or_none()
+                if not hosp_case:
+                    hosp_case = HospitalCase(
+                        emergency_id=emergency_id,
+                        hospital_id=best_hosp_id,
+                        status=HospitalCaseStatus.ACCEPTED,
+                        responded_at=datetime.now(timezone.utc),
+                    )
+                    db.add(hosp_case)
+                else:
+                    hosp_case.status = HospitalCaseStatus.ACCEPTED
+                    hosp_case.responded_at = datetime.now(timezone.utc)
+                await db.commit()
+
+                hosp_accept_payload = {
+                    "emergency_id": emergency.id,
+                    "hospital_id": best_hosp_id,
+                    "hospital_name": hospital_name,
+                    "status": "ACCEPTED",
+                    "message": f"{hospital_name} confirmed emergency acceptance. Transport authorized.",
+                }
+                await manager.send_to_user(user_id, "HOSPITAL_ACCEPTED_CASE", hosp_accept_payload)
+                await manager.send_to_user(user_id, "STATUS_CHANGE", {
+                    "emergency_id": emergency.id,
+                    "status": "HOSPITAL_ACCEPTED",
+                    "hospital_name": hospital_name,
+                })
+                await manager.send_to_driver(driver_id, "HOSPITAL_ACCEPTED_CASE", hosp_accept_payload)
+                await manager.send_to_hospital(best_hosp_id, "CASE_ACCEPTED", hosp_accept_payload)
+                await manager.send_to_dispatchers("HOSPITAL_ACCEPTED_CASE", hosp_accept_payload)
+
+                # Step 3: Ambulance Driver Accepts Dispatch
+                if await is_cancelled_or_stopped():
+                    logger.info(f"Simulation aborted before driver acceptance for emergency {emergency_id}")
                     return
                 await asyncio.sleep(step_delay)
                 await EmergencyService.update_status(
                     db, emergency_id, EmergencyStatus.DRIVER_ACCEPTED,
-                    changed_by_user_id=driver_id, notes="Driver accepted emergency assignment."
+                    changed_by_user_id=driver_id, notes=f"Driver accepted dispatch. Destination: {hospital_name}."
                 )
 
-                # Step 2: En route to pickup
+                # Step 4: Ambulance en route to pickup
                 if await is_cancelled_or_stopped():
-                    logger.info(f"Simulation aborted before step 2 for emergency {emergency_id}")
+                    logger.info(f"Simulation aborted before en route to pickup for emergency {emergency_id}")
                     return
                 await asyncio.sleep(step_delay)
                 await EmergencyService.update_status(
                     db, emergency_id, EmergencyStatus.EN_ROUTE_TO_PICKUP,
-                    changed_by_user_id=driver_id, notes="Unit rolling toward pickup location."
+                    changed_by_user_id=driver_id, notes="Unit rolling toward patient pickup coordinates."
                 )
 
                 # Simulate navigation along route from ambulance position to pickup
@@ -131,9 +190,9 @@ class SimulationRunner:
                     await manager.send_to_driver(driver_id, "AMBULANCE_LOCATION_UPDATE", loc_payload)
                     await manager.send_to_dispatchers("AMBULANCE_LOCATION_UPDATE", loc_payload)
 
-                # Step 3: Arrived at pickup
+                # Step 5: Arrived at pickup
                 if await is_cancelled_or_stopped():
-                    logger.info(f"Simulation aborted before step 3 for emergency {emergency_id}")
+                    logger.info(f"Simulation aborted before arrived at pickup for emergency {emergency_id}")
                     return
                 await asyncio.sleep(step_delay)
                 await EmergencyService.update_status(
@@ -141,56 +200,24 @@ class SimulationRunner:
                     changed_by_user_id=driver_id, notes="Ambulance arrived on scene."
                 )
 
-                # Step 4: Patient onboard
+                # Step 6: Driver confirms patient pickup via pop-up
                 if await is_cancelled_or_stopped():
-                    logger.info(f"Simulation aborted before step 4 for emergency {emergency_id}")
+                    logger.info(f"Simulation aborted before patient pickup for emergency {emergency_id}")
                     return
                 await asyncio.sleep(step_delay * 1.2)
                 await EmergencyService.update_status(
                     db, emergency_id, EmergencyStatus.PATIENT_ONBOARD,
-                    changed_by_user_id=driver_id, notes="Patient secured onboard. Stabilizing vitals."
+                    changed_by_user_id=driver_id, notes=f"Patient secured onboard. Confirmed transit to {hospital_name}."
                 )
 
-                # Step 5: Recommended Hospital selection
+                # Step 7: En route to selected hospital
                 if await is_cancelled_or_stopped():
-                    logger.info(f"Simulation aborted before step 5 for emergency {emergency_id}")
-                    return
-                await asyncio.sleep(step_delay)
-                recs = await HospitalRecommendationService.get_recommendations(
-                    db, emergency.pickup_lat, emergency.pickup_lng, emergency.emergency_type
-                )
-                best_hosp_id = recs[0].hospital_id if recs else 1
-                await EmergencyService.select_hospital(
-                    db, emergency_id, best_hosp_id,
-                    selected_by_user_id=user_id,
-                    notes=f"Confirmed destination: {recs[0].name if recs else 'Hospital'}"
-                )
-
-                # Step 6: Hospital accepts incoming case
-                if await is_cancelled_or_stopped():
-                    logger.info(f"Simulation aborted before step 6 for emergency {emergency_id}")
-                    return
-                await asyncio.sleep(step_delay)
-                hosp = await db.get(Hospital, best_hosp_id)
-                hosp_payload = {
-                    "emergency_id": emergency.id,
-                    "hospital_id": best_hosp_id,
-                    "status": HospitalCaseStatus.ACCEPTED.value,
-                    "hospital_name": hosp.name if hosp else "Hospital",
-                }
-                await manager.send_to_hospital(best_hosp_id, "CASE_ACCEPTED", hosp_payload)
-                await manager.send_to_driver(driver_id, "HOSPITAL_ACCEPTED_CASE", hosp_payload)
-                await manager.send_to_user(user_id, "HOSPITAL_ACCEPTED_CASE", hosp_payload)
-                await manager.send_to_dispatchers("HOSPITAL_ACCEPTED_CASE", hosp_payload)
-
-                # Step 7: En route to hospital
-                if await is_cancelled_or_stopped():
-                    logger.info(f"Simulation aborted before step 7 for emergency {emergency_id}")
+                    logger.info(f"Simulation aborted before transit to hospital for emergency {emergency_id}")
                     return
                 await asyncio.sleep(step_delay)
                 await EmergencyService.update_status(
                     db, emergency_id, EmergencyStatus.EN_ROUTE_TO_HOSPITAL,
-                    changed_by_user_id=driver_id, notes="Transporting patient to confirmed emergency hospital."
+                    changed_by_user_id=driver_id, notes=f"Directing transport along route to {hospital_name}."
                 )
 
                 # Simulate navigation from pickup to hospital
@@ -222,22 +249,22 @@ class SimulationRunner:
 
                 # Step 8: Arrived at hospital
                 if await is_cancelled_or_stopped():
-                    logger.info(f"Simulation aborted before step 8 for emergency {emergency_id}")
+                    logger.info(f"Simulation aborted before arriving at hospital for emergency {emergency_id}")
                     return
                 await asyncio.sleep(step_delay)
                 await EmergencyService.update_status(
                     db, emergency_id, EmergencyStatus.ARRIVED_AT_HOSPITAL,
-                    changed_by_user_id=driver_id, notes="Arrived at Emergency Department entrance. Handover underway."
+                    changed_by_user_id=driver_id, notes=f"Arrived at {hospital_name} Emergency Department entrance."
                 )
 
-                # Step 9: Case Completed
+                # Step 9: Case Handover & Completion
                 if await is_cancelled_or_stopped():
-                    logger.info(f"Simulation aborted before step 9 for emergency {emergency_id}")
+                    logger.info(f"Simulation aborted before case completion for emergency {emergency_id}")
                     return
                 await asyncio.sleep(step_delay * 1.5)
                 await EmergencyService.update_status(
                     db, emergency_id, EmergencyStatus.CASE_COMPLETED,
-                    changed_by_user_id=driver_id, notes="Patient successfully admitted. Trip completed."
+                    changed_by_user_id=driver_id, notes="Clinical handover completed. Patient admitted to emergency ward."
                 )
 
                 logger.info(f"Simulation completed successfully for emergency {emergency_id}")

@@ -88,6 +88,21 @@ async def create_emergency(
         # If matching fails, request remains in SEARCHING_AMBULANCE state for dispatcher attention
         pass
 
+    if emergency.selected_hospital_id:
+        inbound_data = {
+            "emergency_id": emergency.id,
+            "patient_name": emergency.patient_name,
+            "emergency_type": emergency.emergency_type.value if hasattr(emergency.emergency_type, "value") else str(emergency.emergency_type),
+            "priority": emergency.priority.value if hasattr(emergency.priority, "value") else str(emergency.priority),
+            "pickup_address": emergency.pickup_address,
+            "pickup_lat": emergency.pickup_lat,
+            "pickup_lng": emergency.pickup_lng,
+            "contact_phone": emergency.contact_number,
+            "status": "NOTIFIED",
+        }
+        await manager.send_to_hospital(emergency.selected_hospital_id, "NEW_INBOUND_AMBULANCE", inbound_data)
+        await manager.send_to_hospital(emergency.selected_hospital_id, "INBOUND_CASE_REQUEST", inbound_data)
+
     full_emergency = await EmergencyService.get_emergency_by_id(db, emergency.id)
     return full_emergency
 
@@ -319,6 +334,7 @@ async def cancel_emergency(
     return updated
 
 @router.post("/{emergency_id}/status", response_model=EmergencyResponse)
+@router.patch("/{emergency_id}/status", response_model=EmergencyResponse)
 async def update_emergency_status(
     emergency_id: int,
     payload: EmergencyStatusUpdate,
