@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}System Administrator & Fleet Telemetry Matrix — ResQ{% endblock %}
+
+{% block content %}
+<div style="max-width: 1400px; margin: 0 auto; padding: 24px 20px; display: flex; flex-direction: column; gap: 24px;">
+
+  <!-- Admin Header -->
+  <div class="glass-panel" style="padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(239, 68, 68, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">
+        🛡️
+      </div>
+      <div>
+        <h1 style="font-size: 1.35rem; color: #FFF; margin: 0;">System Administrator &bull; ResQ Mission Platform</h1>
+        <div style="font-size: 0.8rem; color: #94A3B8;">Full Audit Trail &bull; Fleet Readiness Telemetry &bull; Operational KPIs</div>
+      </div>
+    </div>
+
+    <!-- Tab Buttons -->
+    <div style="display: flex; gap: 8px;">
+      <button onclick="switchTab('overview')" id="tab-btn-overview" class="btn btn-primary btn-sm">Overview</button>
+      <button onclick="switchTab('fleet')" id="tab-btn-fleet" class="btn btn-outline btn-sm">Fleet Inventory</button>
+      <button onclick="switchTab('hospitals')" id="tab-btn-hospitals" class="btn btn-outline btn-sm">Hospital Network</button>
+      <button onclick="switchTab('audit')" id="tab-btn-audit" class="btn btn-outline btn-sm">Audit Logs</button>
+    </div>
+  </div>
+
+  <!-- KPI Summary Cards -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px;">
+    
+    <div class="glass-panel" style="padding: 20px; display: flex; align-items: center; gap: 16px;">
+      <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(239, 68, 68, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">🚨</div>
+      <div>
+        <div id="kpi-total-emergencies" style="font-size: 1.8rem; font-weight: 800; color: #FFF; font-family: var(--font-mono);">12</div>
+        <div style="font-size: 0.8rem; color: #94A3B8;">Emergencies Logged Today</div>
+      </div>
+    </div>
+
+    <div class="glass-panel" style="padding: 20px; display: flex; align-items: center; gap: 16px;">
+      <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">🚑</div>
+      <div>
+        <div id="kpi-fleet-available" style="font-size: 1.8rem; font-weight: 800; color: #34D399; font-family: var(--font-mono);">8 / 10</div>
+        <div style="font-size: 0.8rem; color: #94A3B8;">ALS Ambulances Available</div>
+      </div>
+    </div>
+
+    <div class="glass-panel" style="padding: 20px; display: flex; align-items: center; gap: 16px;">
+      <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(59, 130, 246, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">⏱️</div>
+      <div>
+        <div id="kpi-response-time" style="font-size: 1.8rem; font-weight: 800; color: var(--cyan-400); font-family: var(--font-mono);">6.4m</div>
+        <div style="font-size: 0.8rem; color: #94A3B8;">Avg Response Time</div>
+      </div>
+    </div>
+
+    <div class="glass-panel" style="padding: 20px; display: flex; align-items: center; gap: 16px;">
+      <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(168, 85, 247, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">🏥</div>
+      <div>
+        <div id="kpi-icu-beds" style="font-size: 1.8rem; font-weight: 800; color: #C084FC; font-family: var(--font-mono);">24</div>
+        <div style="font-size: 0.8rem; color: #94A3B8;">Network ICU Beds Ready</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Tab Content: Overview -->
+  <div id="tab-content-overview" class="glass-panel" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+    <h2 style="font-size: 1.15rem; color: #FFF; margin: 0;">Platform Health &amp; Subsystem Status</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+      <div style="background: rgba(13, 19, 34, 0.6); padding: 16px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.06);">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span style="color: #94A3B8; font-size: 0.85rem;">FastAPI Core Engine</span>
+          <span class="badge badge-emerald">OPERATIONAL</span>
+        </div>
+        <div style="font-size: 0.78rem; color: #64748B;">Version 1.0.0 &bull; Lifespan Healthy &bull; Async Uvicorn</div>
+      </div>
+
+      <div style="background: rgba(13, 19, 34, 0.6); padding: 16px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.06);">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span style="color: #94A3B8; font-size: 0.85rem;">WebSocket PubSub Broker</span>
+          <span class="badge badge-emerald">CONNECTED</span>
+        </div>
+        <div style="font-size: 0.78rem; color: #64748B;">Multi-Room Driver, Citizen, Hospital, Dispatcher channels</div>
+      </div>
+
+      <div style="background: rgba(13, 19, 34, 0.6); padding: 16px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.06);">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span style="color: #94A3B8; font-size: 0.85rem;">SQLAlchemy 2.0 Async ORM</span>
+          <span class="badge badge-emerald">OPTIMAL</span>
+        </div>
+        <div style="font-size: 0.78rem; color: #64748B;">SQLite Engine &bull; Zero connection leaks &bull; Auto-seeded</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Content: Fleet Inventory -->
+  <div id="tab-content-fleet" class="glass-panel" style="display: none; padding: 24px; flex-direction: column; gap: 16px;">
+    <h2 style="font-size: 1.15rem; color: #FFF; margin: 0;">Emergency Fleet Inventory &amp; Telemetry</h2>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: left;">
+        <thead>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.12); color: #94A3B8; font-size: 0.76rem; text-transform: uppercase;">
+            <th style="padding: 12px 14px;">Vehicle Number</th>
+            <th style="padding: 12px 14px;">Type</th>
+            <th style="padding: 12px 14px;">Status</th>
+            <th style="padding: 12px 14px;">Speed</th>
+            <th style="padding: 12px 14px;">Equipment</th>
+          </tr>
+        </thead>
+        <tbody id="fleet-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab Content: Hospital Network -->
+  <div id="tab-content-hospitals" class="glass-panel" style="display: none; padding: 24px; flex-direction: column; gap: 16px;">
+    <h2 style="font-size: 1.15rem; color: #FFF; margin: 0;">Connected Hospital Trauma Network</h2>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: left;">
+        <thead>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.12); color: #94A3B8; font-size: 0.76rem; text-transform: uppercase;">
+            <th style="padding: 12px 14px;">Hospital Name</th>
+            <th style="padding: 12px 14px;">Address</th>
+            <th style="padding: 12px 14px;">ICU Beds</th>
+            <th style="padding: 12px 14px;">General Beds</th>
+            <th style="padding: 12px 14px;">Ventilators</th>
+            <th style="padding: 12px 14px;">Status</th>
+          </tr>
+        </thead>
+        <tbody id="hospitals-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab Content: Audit Logs -->
+  <div id="tab-content-audit" class="glass-panel" style="display: none; padding: 24px; flex-direction: column; gap: 16px;">
+    <h2 style="font-size: 1.15rem; color: #FFF; margin: 0;">System Audit &amp; Event Trail</h2>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+        <thead>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.12); color: #94A3B8; font-size: 0.76rem; text-transform: uppercase;">
+            <th style="padding: 10px 12px;">Timestamp</th>
+            <th style="padding: 10px 12px;">Action</th>
+            <th style="padding: 10px 12px;">Entity</th>
+            <th style="padding: 10px 12px;">Details</th>
+          </tr>
+        </thead>
+        <tbody id="audit-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let ambulances = [];
+  let hospitals = [];
+  let auditLogs = [];
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    await loadAdminData();
+  });
+
+  async function loadAdminData() {
+    try {
+      const [ambRes, hospRes, auditRes] = await Promise.all([
+        fetch('/api/v1/ambulances/').then(r => r.json()),
+        fetch('/api/v1/hospitals/').then(r => r.json()),
+        fetch('/api/v1/analytics/audit-logs?limit=40').then(r => r.ok ? r.json() : []),
+      ]);
+
+      ambulances = ambRes || [];
+      hospitals = hospRes || [];
+      auditLogs = auditRes || [];
+
+      // Update KPIs
+      const avail = ambulances.filter(a => a.availability_status === 'AVAILABLE').length;
+      document.getElementById('kpi-fleet-available').textContent = `${avail} / ${ambulances.length}`;
+
+      const totalIcu = hospitals.reduce((sum, h) => sum + (h.icu_beds_available || 0), 0);
+      document.getElementById('kpi-icu-beds').textContent = totalIcu;
+
+      renderFleetTable();
+      renderHospitalTable();
+      renderAuditTable();
+    } catch (e) {
+      console.warn('Admin load error', e);
+    }
+  }
+
+  function renderFleetTable() {
+    const tbody = document.getElementById('fleet-tbody');
+    tbody.innerHTML = ambulances.map(a => `
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <td style="padding: 12px 14px; font-weight: 700; color: #FFF;">${a.vehicle_number}</td>
+        <td style="padding: 12px 14px;"><span class="badge badge-crimson">${a.ambulance_type}</span></td>
+        <td style="padding: 12px 14px;"><span class="badge ${a.availability_status === 'AVAILABLE' ? 'badge-emerald' : 'badge-amber'}">${a.availability_status}</span></td>
+        <td style="padding: 12px 14px; font-family: var(--font-mono); color: var(--cyan-400);">${a.speed_kmh || 0} km/h</td>
+        <td style="padding: 12px 14px; font-size: 0.8rem; color: #94A3B8;">Ventilator, Defibrillator, ECG</td>
+      </tr>
+    `).join('');
+  }
+
+  function renderHospitalTable() {
+    const tbody = document.getElementById('hospitals-tbody');
+    tbody.innerHTML = hospitals.map(h => `
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <td style="padding: 12px 14px; font-weight: 700; color: #FFF;">${h.name}</td>
+        <td style="padding: 12px 14px; color: #94A3B8; font-size: 0.82rem;">${h.address}</td>
+        <td style="padding: 12px 14px; font-weight: 700; color: #F87171;">${h.icu_beds_available}</td>
+        <td style="padding: 12px 14px; color: #93C5FD;">${h.general_beds_available}</td>
+        <td style="padding: 12px 14px; color: #34D399;">${h.ventilators_available}</td>
+        <td style="padding: 12px 14px;"><span class="badge badge-emerald">${h.emergency_department_status || 'NORMAL'}</span></td>
+      </tr>
+    `).join('');
+  }
+
+  function renderAuditTable() {
+    const tbody = document.getElementById('audit-tbody');
+    if (auditLogs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" style="padding: 24px; text-align: center; color: #64748B;">No system audit logs found.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = auditLogs.map(log => `
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <td style="padding: 10px 12px; color: #94A3B8; font-family: var(--font-mono); font-size: 0.78rem;">${log.created_at || 'Just now'}</td>
+        <td style="padding: 10px 12px; font-weight: 600; color: #FFF;">${log.action}</td>
+        <td style="padding: 10px 12px; color: var(--cyan-400);">${log.entity_type || 'SYSTEM'}</td>
+        <td style="padding: 10px 12px; color: #94A3B8; font-size: 0.8rem;">${log.details || log.description || 'Action recorded'}</td>
+      </tr>
+    `).join('');
+  }
+
+  function switchTab(tab) {
+    ['overview', 'fleet', 'hospitals', 'audit'].forEach(t => {
+      document.getElementById(`tab-content-${t}`).style.display = t === tab ? 'flex' : 'none';
+      const btn = document.getElementById(`tab-btn-${t}`);
+      if (t === tab) {
+        btn.className = 'btn btn-primary btn-sm';
+      } else {
+        btn.className = 'btn btn-outline btn-sm';
+      }
+    });
+  }
+</script>
+{% endblock %}

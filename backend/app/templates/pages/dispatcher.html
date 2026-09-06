@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}Emergency Dispatch Command Center — ResQ{% endblock %}
+
+{% block content %}
+<div style="max-width: 1440px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+
+  <!-- Header -->
+  <div class="glass-panel" style="padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(168, 85, 247, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+        🎧
+      </div>
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h1 style="font-size: 1.25rem; color: #FFF; margin: 0;">Emergency Dispatch Command Center</h1>
+          <span class="badge badge-purple">TACTICAL RADAR</span>
+        </div>
+        <div style="font-size: 0.8rem; color: #94A3B8;">City-wide Incident Triage &bull; Manual Fleet Override &bull; Trauma Hospital Routing</div>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div style="display: flex; gap: 16px; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem;">
+        <span style="color: #94A3B8;">Active Queue:</span>
+        <strong id="stat-queue-count" style="color: #F87171; font-family: var(--font-mono); font-size: 1rem;">0</strong>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem;">
+        <span style="color: #94A3B8;">Fleet Available:</span>
+        <strong id="stat-available-fleet" style="color: #34D399; font-family: var(--font-mono); font-size: 1rem;">0</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Command Center Grid: Queue on Left, Radar Map on Right -->
+  <div style="display: grid; grid-template-columns: 420px 1fr; gap: 20px; min-height: 640px;">
+
+    <!-- Left Column: Pending / Active Incident Queue -->
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      
+      <!-- Incident Queue Panel -->
+      <div class="glass-panel" style="padding: 20px; display: flex; flex-direction: column; gap: 14px; flex: 1;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 10px;">
+          <h2 style="font-size: 1.05rem; color: #FFF; margin: 0; display: flex; align-items: center; gap: 8px;">
+            <span>🚨 Incident Triage Queue</span>
+          </h2>
+          <button onclick="fetchDispatcherOverview()" class="btn btn-outline btn-sm" style="padding: 4px 8px; font-size: 0.75rem;">
+            🔄 Refresh
+          </button>
+        </div>
+
+        <!-- Incident Cards Container -->
+        <div id="incident-queue-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 480px; overflow-y: auto; padding-right: 4px;">
+          <div style="text-align: center; color: #64748B; padding: 40px 10px; font-size: 0.85rem;">
+            No pending distress calls. Fleet is standing by on active radar.
+          </div>
+        </div>
+      </div>
+
+      <!-- Manual Unit Assignment / Override Box -->
+      <div id="manual-override-card" class="glass-panel" style="display: none; padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+        <h3 style="font-size: 0.95rem; color: #FFF; margin: 0; display: flex; align-items: center; gap: 6px;">
+          <span>⚡ Manual Vehicle Dispatch</span>
+        </h3>
+
+        <div>
+          <label style="font-size: 0.78rem; color: #94A3B8; margin-bottom: 4px; display: block;">Select Ambulance Unit</label>
+          <select id="manual-amb-select" class="input-field" style="font-size: 0.85rem;"></select>
+        </div>
+
+        <button onclick="submitManualAssign()" class="btn btn-primary btn-sm" style="width: 100%;">
+          <span>🚀 Transmit Manual Dispatch</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Right Column: Full Tactical Radar Map -->
+    <div class="glass-panel" style="padding: 16px; display: flex; flex-direction: column; gap: 12px; position: relative;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-weight: 700; font-size: 0.95rem; color: #FFF;">City Tactical Radar View</span>
+          <span class="badge badge-emerald" style="font-size: 0.65rem;">LIVE TRACKING</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 14px; font-size: 0.78rem; color: #94A3B8;">
+          <span style="display: flex; align-items: center; gap: 4px;"><span class="pulsing-dot emerald" style="width:6px;height:6px;"></span> Available</span>
+          <span style="display: flex; align-items: center; gap: 4px;"><span class="pulsing-dot" style="width:6px;height:6px;"></span> Dispatched</span>
+          <span style="display: flex; align-items: center; gap: 4px;">🏥 Trauma ER</span>
+        </div>
+      </div>
+
+      <!-- Tactical Map Canvas -->
+      <div id="dispatcher-radar-map" style="width: 100%; flex: 1; min-height: 540px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1);"></div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let radarMap = null;
+  let overviewData = null;
+  let selectedEmergency = null;
+  let ambulanceMarkers = {};
+  let hospitalMarkers = {};
+  let emergencyMarkers = {};
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Initialize Map
+    radarMap = RESQ_MAP.init('dispatcher-radar-map', {
+      center: [12.8235, 80.0445],
+      zoom: 14,
+      tile: 'dark', // Tactical dark by default
+    });
+
+    // 2. Fetch initial overview
+    await fetchDispatcherOverview();
+
+    // 3. Listen to WebSocket events
+    window.addEventListener('resq:msg', (e) => {
+      const msg = e.detail;
+      if (!msg) return;
+
+      if (
+        msg.event === 'DISPATCH_REQUEST' ||
+        msg.event === 'STATUS_CHANGE' ||
+        msg.event === 'LOCATION_UPDATE' ||
+        msg.event === 'SIMULATION_STARTED'
+      ) {
+        fetchDispatcherOverview();
+      }
+    });
+
+    setInterval(fetchDispatcherOverview, 3500);
+  });
+
+  async function fetchDispatcherOverview() {
+    try {
+      const res = await fetch('/api/v1/dispatch/overview');
+      if (res.ok) {
+        const data = await res.json();
+        overviewData = data;
+        renderOverview(data);
+      }
+    } catch (e) {
+      console.warn('Dispatcher overview error', e);
+    }
+  }
+
+  function renderOverview(data) {
+    const emergencies = data.active_emergencies || [];
+    const ambulances = data.all_ambulances || data.ambulances || [];
+    const hospitals = data.hospitals || [];
+
+    // Update top counts
+    document.getElementById('stat-queue-count').textContent = emergencies.length;
+    const availCount = ambulances.filter(a => a.availability_status === 'AVAILABLE').length;
+    document.getElementById('stat-available-fleet').textContent = availCount;
+
+    // Render Queue List
+    const queueContainer = document.getElementById('incident-queue-list');
+    if (emergencies.length === 0) {
+      queueContainer.innerHTML = `
+        <div style="text-align: center; color: #64748B; padding: 40px 10px; font-size: 0.85rem;">
+          No pending distress calls. Fleet is standing by on active radar.
+        </div>
+      `;
+      document.getElementById('manual-override-card').style.display = 'none';
+    } else {
+      queueContainer.innerHTML = emergencies.map(em => `
+        <div onclick="selectEmergency('${em.id}')" style="background: ${selectedEmergency?.id === em.id ? 'rgba(239, 68, 68, 0.15)' : 'rgba(13, 19, 34, 0.6)'}; border: 1px solid ${selectedEmergency?.id === em.id ? '#EF4444' : 'rgba(255,255,255,0.08)'}; border-radius: 10px; padding: 14px; cursor: pointer; transition: all 0.2s ease;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <strong style="color: #FFF; font-size: 0.92rem;">${em.emergency_type || 'Cardiac Emergency'}</strong>
+            <span class="badge ${em.priority === 'CRITICAL' ? 'badge-crimson' : 'badge-amber'}">${em.priority || 'CRITICAL'}</span>
+          </div>
+          <div style="font-size: 0.78rem; color: #94A3B8; margin-bottom: 4px;">📍 ${em.pickup_address || 'Potheri, Chennai'}</div>
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #64748B;">
+            <span>Status: <strong style="color: var(--cyan-400);">${(em.status || 'PENDING').replace(/_/g, ' ')}</strong></span>
+            <span>Unit: <strong style="color: #FFF;">${em.ambulance?.vehicle_number || 'Unassigned'}</strong></span>
+          </div>
+        </div>
+      `).join('');
+
+      if (!selectedEmergency && emergencies.length > 0) {
+        selectEmergency(emergencies[0].id);
+      }
+    }
+
+    // Populate manual ambulance select
+    const sel = document.getElementById('manual-amb-select');
+    sel.innerHTML = ambulances.map(a => `
+      <option value="${a.id}">${a.vehicle_number} (${a.ambulance_type} - ${a.availability_status})</option>
+    `).join('');
+
+    // Update Markers on Radar Map
+    ambulances.forEach(a => {
+      const lat = a.current_latitude || a.current_lat;
+      const lng = a.current_longitude || a.current_lng;
+      if (lat && lng) {
+        const isDispatched = a.availability_status !== 'AVAILABLE';
+        if (!ambulanceMarkers[a.id]) {
+          const icon = RESQ_MAP.createAmbulanceIcon(a, isDispatched);
+          ambulanceMarkers[a.id] = L.marker([lat, lng], { icon }).addTo(radarMap);
+        } else {
+          ambulanceMarkers[a.id].setLatLng([lat, lng]);
+          const rot = ambulanceMarkers[a.id].getElement()?.querySelector('.vehicle-rotate-box');
+          if (rot) rot.style.transform = `rotate(${a.current_heading || 0}deg)`;
+        }
+      }
+    });
+
+    hospitals.forEach(h => {
+      if (h.latitude && h.longitude && !hospitalMarkers[h.id]) {
+        const icon = RESQ_MAP.createHospitalIcon(h, false);
+        hospitalMarkers[h.id] = L.marker([h.latitude, h.longitude], { icon }).addTo(radarMap);
+      }
+    });
+  }
+
+  function selectEmergency(id) {
+    if (!overviewData) return;
+    const found = (overviewData.active_emergencies || []).find(e => e.id === id);
+    if (found) {
+      selectedEmergency = found;
+      document.getElementById('manual-override-card').style.display = 'flex';
+      renderOverview(overviewData);
+
+      const lat = found.pickup_lat ?? found.pickup_latitude;
+      const lng = found.pickup_lng ?? found.pickup_longitude;
+      if (lat && lng) {
+        radarMap.panTo([lat, lng], { animate: true, duration: 1.0 });
+      }
+    }
+  }
+
+  async function submitManualAssign() {
+    if (!selectedEmergency) return;
+    const ambId = document.getElementById('manual-amb-select').value;
+    try {
+      const res = await fetch(`/api/v1/dispatch/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emergency_id: selectedEmergency.id,
+          ambulance_id: ambId,
+          notes: 'Manual dispatcher override'
+        })
+      });
+      if (res.ok) {
+        RESQ.playChime();
+        RESQ.toast('Dispatch Transmitted', 'Assigned unit and sent siren alert', 'emerald');
+        fetchDispatcherOverview();
+      }
+    } catch (e) {
+      RESQ.toast('Error', e.message, 'crimson');
+    }
+  }
+</script>
+{% endblock %}

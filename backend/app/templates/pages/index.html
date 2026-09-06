@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}ResQ — 24/7 Emergency Medical Response & Fleet Tracking Platform{% endblock %}
+
+{% block content %}
+<div class="lifecare-portal">
+  <!-- Hero Section -->
+  <section style="position: relative; padding: 60px 24px 80px; overflow: hidden; background: radial-gradient(circle at 50% 20%, rgba(239, 68, 68, 0.12) 0%, rgba(8, 13, 26, 0) 70%);">
+    <div style="max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 20px;">
+      
+      <!-- Emergency Hotline Pill -->
+      <div style="display: inline-flex; align-items: center; gap: 10px; padding: 6px 16px; border-radius: 9999px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);">
+        <span class="pulsing-dot" style="width: 8px; height: 8px;"></span>
+        <span style="font-size: 0.85rem; font-weight: 700; color: #FCA5A5; letter-spacing: 0.05em; text-transform: uppercase;">
+          24/7 National Emergency Hotline: <strong style="color: #FFF;">108 / +91 99999 10800</strong>
+        </span>
+      </div>
+
+      <h1 style="font-size: 3.2rem; font-weight: 800; line-height: 1.15; max-width: 850px; color: #FFF; letter-spacing: -0.03em;">
+        Emergency Medical Care When <span style="background: linear-gradient(135deg, #EF4444 0%, #F87171 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Every Second Matters</span>
+      </h1>
+
+      <p style="font-size: 1.15rem; color: #94A3B8; max-width: 680px; line-height: 1.6;">
+        India's first AI-assisted Emergency Medical Dispatch (EMD) network connecting distressed citizens, ICU ambulances, and hospital trauma centers in real-time.
+      </p>
+
+      <!-- Action Buttons -->
+      <div style="display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 10px;">
+        <a href="/citizen" class="btn btn-primary btn-lg" style="box-shadow: 0 8px 25px rgba(239, 68, 68, 0.45); font-size: 1.05rem;">
+          <span>🚨 Request Emergency Ambulance</span>
+        </a>
+        <button onclick="RESQ.toggleSimulation()" class="btn btn-emerald btn-lg" style="font-size: 1.05rem;">
+          <span>▶ Watch 1-Click Live Simulation</span>
+        </button>
+        <a href="/dispatcher" class="btn btn-outline btn-lg" style="font-size: 1.05rem;">
+          <span>🎧 Dispatcher Command</span>
+        </a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Floating Trust Bar -->
+  <div style="max-width: 1100px; margin: -30px auto 40px; padding: 0 20px; position: relative; z-index: 10;">
+    <div class="glass-panel" style="padding: 24px 32px; display: flex; justify-content: space-around; flex-wrap: wrap; gap: 24px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(15, 23, 42, 0.85);">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(239, 68, 68, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">⏱️</div>
+        <div>
+          <div style="font-size: 1.4rem; font-weight: 800; color: #FFF;">&lt; 8 Mins</div>
+          <div style="font-size: 0.82rem; color: #94A3B8;">Average Dispatch Arrival</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🚑</div>
+        <div>
+          <div style="font-size: 1.4rem; font-weight: 800; color: #FFF;">99.8%</div>
+          <div style="font-size: 0.82rem; color: #94A3B8;">Fleet Readiness &amp; ALS Active</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(59, 130, 246, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🏥</div>
+        <div>
+          <div style="font-size: 1.4rem; font-weight: 800; color: #FFF;">40+ Hospitals</div>
+          <div style="font-size: 0.82rem; color: #94A3B8;">Connected ER Trauma Network</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(168, 85, 247, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">📡</div>
+        <div>
+          <div style="font-size: 1.4rem; font-weight: 800; color: #FFF;">Zero-Lag</div>
+          <div style="font-size: 0.82rem; color: #94A3B8;">Bi-Directional WebSockets</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live City Tactical Overview Section -->
+  <section style="max-width: 1200px; margin: 0 auto 60px; padding: 0 24px;">
+    <div class="glass-panel" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="font-size: 1.4rem; color: #FFF;">Active City Telemetry Radar</h2>
+          <p style="font-size: 0.85rem; color: #94A3B8;">Live ambulances patrolling Chennai / Potheri corridor ready for immediate dispatch.</p>
+        </div>
+        <a href="/citizen" class="btn btn-primary btn-sm">
+          <span>🚨 Open Citizen SOS Console &rarr;</span>
+        </a>
+      </div>
+
+      <!-- Preview Map Container -->
+      <div id="landing-preview-map" style="width: 100%; height: 420px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1);"></div>
+    </div>
+  </section>
+
+  <!-- Emergency Services Grid -->
+  <section style="max-width: 1200px; margin: 0 auto 60px; padding: 0 24px;">
+    <div style="text-align: center; margin-bottom: 36px;">
+      <h2 style="font-size: 2rem; color: #FFF; margin-bottom: 8px;">Critical Emergency Services</h2>
+      <p style="color: #94A3B8; font-size: 0.95rem;">Rapid triage, life-saving equipment, and specialized medical transit units.</p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px;">
+      <!-- Service 1 -->
+      <div class="glass-panel" style="padding: 24px; display: flex; flex-direction: column; gap: 12px; transition: transform 0.2s ease;">
+        <div style="font-size: 2.2rem;">🫀</div>
+        <h3 style="font-size: 1.15rem; color: #FFF;">Advanced Life Support (ALS)</h3>
+        <p style="font-size: 0.85rem; color: #94A3B8; line-height: 1.5;">Equipped with portable ventilators, biphasic defibrillators, multi-para monitors, and certified emergency paramedics.</p>
+        <span class="badge badge-crimson" style="width: fit-content; margin-top: auto;">Level 1 Trauma</span>
+      </div>
+
+      <!-- Service 2 -->
+      <div class="glass-panel" style="padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 2.2rem;">🚑</div>
+        <h3 style="font-size: 1.15rem; color: #FFF;">Basic Life Support (BLS)</h3>
+        <p style="font-size: 0.85rem; color: #94A3B8; line-height: 1.5;">Oxygen delivery systems, orthopedic stretchers, suction units, and trained emergency medical technicians.</p>
+        <span class="badge badge-amber" style="width: fit-content; margin-top: auto;">Level 2 Priority</span>
+      </div>
+
+      <!-- Service 3 -->
+      <div class="glass-panel" style="padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 2.2rem;">🚁</div>
+        <h3 style="font-size: 1.15rem; color: #FFF;">Air Medical Evacuation</h3>
+        <p style="font-size: 0.85rem; color: #94A3B8; line-height: 1.5;">Long-distance helicopter emergency medical transport with flight physicians and intensive care support.</p>
+        <span class="badge badge-cyan" style="width: fit-content; margin-top: auto;">Rapid Transit</span>
+      </div>
+
+      <!-- Service 4 -->
+      <div class="glass-panel" style="padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 2.2rem;">👶</div>
+        <h3 style="font-size: 1.15rem; color: #FFF;">Neonatal &amp; Pediatric ICU</h3>
+        <p style="font-size: 0.85rem; color: #94A3B8; line-height: 1.5;">Incubators, nitric oxide delivery, and pediatric-certified intensive care specialists for fragile newborns.</p>
+        <span class="badge badge-emerald" style="width: fit-content; margin-top: auto;">Specialized ICU</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Initialize landing preview map
+  document.addEventListener('DOMContentLoaded', async () => {
+    const map = RESQ_MAP.init('landing-preview-map', {
+      center: [12.8235, 80.0445],
+      zoom: 14,
+    });
+
+    try {
+      // Fetch ambulances and hospitals
+      const [ambRes, hospRes] = await Promise.all([
+        fetch('/api/v1/ambulances/').then(r => r.json()),
+        fetch('/api/v1/hospitals/').then(r => r.json()),
+      ]);
+
+      // Add ambulances
+      ambRes.forEach(amb => {
+        const lat = amb.current_latitude || amb.current_lat;
+        const lng = amb.current_longitude || amb.current_lng;
+        if (lat && lng) {
+          const icon = RESQ_MAP.createAmbulanceIcon(amb, false);
+          L.marker([lat, lng], { icon }).addTo(map).bindPopup(`
+            <strong>${amb.vehicle_number}</strong><br>
+            Type: ${amb.ambulance_type}<br>
+            Status: ${amb.availability_status}
+          `);
+        }
+      });
+
+      // Add hospitals
+      hospRes.forEach(hosp => {
+        if (hosp.latitude && hosp.longitude) {
+          const icon = RESQ_MAP.createHospitalIcon(hosp, false);
+          L.marker([hosp.latitude, hosp.longitude], { icon }).addTo(map).bindPopup(`
+            <strong>${hosp.name}</strong><br>
+            ICU Beds: ${hosp.icu_beds_available}<br>
+            Status: ${hosp.emergency_department_status}
+          `);
+        }
+      });
+    } catch (e) {
+      console.warn('Could not load map markers', e);
+    }
+  });
+</script>
+{% endblock %}

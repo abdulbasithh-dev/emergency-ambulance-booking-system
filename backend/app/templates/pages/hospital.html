@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}Hospital ER Trauma Triage & Capacity Console — ResQ{% endblock %}
+
+{% block content %}
+<div style="max-width: 1300px; margin: 0 auto; padding: 24px 20px; display: flex; flex-direction: column; gap: 24px;">
+
+  <!-- Header & Hospital Selector -->
+  <div class="glass-panel" style="padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">
+        🏥
+      </div>
+      <div>
+        <h1 style="font-size: 1.35rem; color: #FFF; margin: 0;">Emergency Trauma Center &bull; ER Cockpit</h1>
+        <div style="font-size: 0.8rem; color: #94A3B8;">Real-time Inbound Telemetry &bull; ICU Bed &amp; Ventilator Capacity Management</div>
+      </div>
+    </div>
+
+    <!-- Hospital Selector Dropdown -->
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <label style="font-size: 0.82rem; color: #94A3B8;">Active Hospital:</label>
+      <select id="hospital-select" class="input-field" style="width: 260px;" onchange="changeHospital(this.value)">
+        <!-- populated dynamically -->
+      </select>
+    </div>
+  </div>
+
+  <!-- Live Capacity Counters & ER Status Matrix -->
+  <div class="glass-panel" style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 12px; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h2 style="font-size: 1.15rem; color: #FFF; margin: 0;">Clinical Bed &amp; Critical Equipment Capacity</h2>
+        <div style="font-size: 0.78rem; color: #94A3B8;">Adjust availability counters in real-time. Changes immediately update the AI matching engine.</div>
+      </div>
+      <button onclick="saveCapacity()" class="btn btn-emerald btn-sm" id="save-capacity-btn">
+        <span>💾 Save Capacity</span>
+      </button>
+    </div>
+
+    <!-- Counter Cards Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+      
+      <!-- ICU Beds -->
+      <div style="background: rgba(13, 19, 34, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.82rem; font-weight: 700; color: #FCA5A5;">ICU BEDS AVAILABLE</span>
+          <span style="font-size: 1.4rem;">🛏️</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <button class="btn btn-outline btn-sm" onclick="adjustCount('icu', -1)" style="width: 38px; height: 38px; padding: 0; font-size: 1.2rem;">-</button>
+          <span id="count-icu" style="font-size: 2rem; font-weight: 800; color: #FFF; font-family: var(--font-mono);">6</span>
+          <button class="btn btn-outline btn-sm" onclick="adjustCount('icu', 1)" style="width: 38px; height: 38px; padding: 0; font-size: 1.2rem;">+</button>
+        </div>
+        <div style="font-size: 0.75rem; color: #94A3B8; text-align: center;">Critical Care Resuscitation Units</div>
+      </div>
+
+      <!-- General Beds -->
+      <div style="background: rgba(13, 19, 34, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.82rem; font-weight: 700; color: #93C5FD;">GENERAL ER BEDS</span>
+          <span style="font-size: 1.4rem;">🏥</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <button class="btn btn-outline btn-sm" onclick="adjustCount('general', -1)" style="width: 38px; height: 38px; padding: 0; font-size: 1.2rem;">-</button>
+          <span id="count-general" style="font-size: 2rem; font-weight: 800; color: #FFF; font-family: var(--font-mono);">18</span>
+          <button class="btn btn-outline btn-sm" onclick="adjustCount('general', 1)" style="width: 38px; height: 38px; padding: 0; font-size: 1.2rem;">+</button>
+        </div>
+        <div style="font-size: 0.75rem; color: #94A3B8; text-align: center;">Standard Observation &amp; Triage</div>
+      </div>
+
+      <!-- Ventilators -->
+      <div style="background: rgba(13, 19, 34, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.82rem; font-weight: 700; color: #6EE7B7;">VENTILATORS</span>
+          <span style="font-size: 1.4rem;">🫁</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <button class="btn btn-outline btn-sm" onclick="adjustCount('vent', -1)" style="width: 38px; height: 38px; padding: 0; font-size: 1.2rem;">-</button>
+          <span id="count-vent" style="font-size: 2rem; font-weight: 800; color: #FFF; font-family: var(--font-mono);">4</span>
+          <button class="btn btn-outline btn-sm" onclick="adjustCount('vent', 1)" style="width: 38px; height: 38px; padding: 0; font-size: 1.2rem;">+</button>
+        </div>
+        <div style="font-size: 0.75rem; color: #94A3B8; text-align: center;">Mechanical Ventilation Units</div>
+      </div>
+
+      <!-- ER Status -->
+      <div style="background: rgba(13, 19, 34, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.82rem; font-weight: 700; color: #FCD34D;">DEPARTMENT STATUS</span>
+          <span style="font-size: 1.4rem;">🚦</span>
+        </div>
+        <div>
+          <select id="status-select" class="input-field" style="font-weight: 700; font-size: 0.95rem;">
+            <option value="NORMAL">🟢 NORMAL (Accepting All Cases)</option>
+            <option value="BUSY">🟡 BUSY (Delays Possible)</option>
+            <option value="CRITICAL">🔴 CRITICAL (Diversion Advised)</option>
+            <option value="DIVERTING">⛔ DIVERTING (ER Closed to Inbound)</option>
+          </select>
+        </div>
+        <div style="font-size: 0.75rem; color: #94A3B8; text-align: center;">Broadcast status to dispatchers</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Inbound Emergency Ambulances Table -->
+  <div class="glass-panel" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h2 style="font-size: 1.2rem; color: #FFF; margin: 0; display: flex; align-items: center; gap: 8px;">
+          <span>🚨 Inbound Trauma Cases &amp; Patient Handover</span>
+          <span id="inbound-count-badge" class="badge badge-crimson">0 Inbound</span>
+        </h2>
+        <div style="font-size: 0.8rem; color: #94A3B8;">Real-time GPS telemetry from approaching emergency ambulances.</div>
+      </div>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: left;">
+        <thead>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.12); color: #94A3B8; font-size: 0.76rem; text-transform: uppercase;">
+            <th style="padding: 12px 14px;">Incident Details</th>
+            <th style="padding: 12px 14px;">Priority</th>
+            <th style="padding: 12px 14px;">Assigned Unit</th>
+            <th style="padding: 12px 14px;">ETA</th>
+            <th style="padding: 12px 14px;">Assigned ER Doctor</th>
+            <th style="padding: 12px 14px; text-align: right;">Handover Action</th>
+          </tr>
+        </thead>
+        <tbody id="inbound-cases-tbody">
+          <tr>
+            <td colspan="6" style="padding: 32px; text-align: center; color: #64748B;">
+              No inbound trauma cases currently routed to this trauma center.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let hospitals = [];
+  let currentHospital = null;
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    await fetchHospitals();
+
+    // Listen to WebSocket events
+    window.addEventListener('resq:msg', (e) => {
+      const msg = e.detail;
+      if (msg && (msg.event === 'NEW_INBOUND_AMBULANCE' || msg.event === 'CAPACITY_UPDATED' || msg.event === 'SIMULATION_STARTED')) {
+        if (currentHospital) loadHospitalData(currentHospital.id);
+      }
+    });
+
+    setInterval(() => {
+      if (currentHospital) loadHospitalData(currentHospital.id);
+    }, 4000);
+  });
+
+  async function fetchHospitals() {
+    try {
+      const res = await fetch('/api/v1/hospitals/');
+      hospitals = await res.json();
+      const sel = document.getElementById('hospital-select');
+      sel.innerHTML = hospitals.map(h => `<option value="${h.id}">${h.name}</option>`).join('');
+
+      if (hospitals.length > 0) {
+        currentHospital = hospitals[0];
+        loadHospitalData(currentHospital.id);
+      }
+    } catch (e) {
+      console.warn('Error fetching hospitals', e);
+    }
+  }
+
+  function changeHospital(hospId) {
+    const found = hospitals.find(h => h.id === hospId);
+    if (found) {
+      currentHospital = found;
+      loadHospitalData(found.id);
+    }
+  }
+
+  async function loadHospitalData(hospId) {
+    try {
+      const [hRes, casesRes] = await Promise.all([
+        fetch(`/api/v1/hospitals/${hospId}`).then(r => r.json()),
+        fetch(`/api/v1/hospitals/${hospId}/cases`).then(r => r.json()),
+      ]);
+
+      currentHospital = hRes;
+      document.getElementById('count-icu').textContent = hRes.icu_beds_available ?? 5;
+      document.getElementById('count-general').textContent = hRes.general_beds_available ?? 18;
+      document.getElementById('count-vent').textContent = hRes.ventilators_available ?? 4;
+      document.getElementById('status-select').value = hRes.emergency_department_status || 'NORMAL';
+
+      renderInboundCases(casesRes || []);
+    } catch (e) {
+      console.warn('Load hospital data error', e);
+    }
+  }
+
+  function adjustCount(type, delta) {
+    const el = document.getElementById(`count-${type}`);
+    let val = parseInt(el.textContent, 10) || 0;
+    val = Math.max(0, val + delta);
+    el.textContent = val;
+  }
+
+  async function saveCapacity() {
+    if (!currentHospital) return;
+    const btn = document.getElementById('save-capacity-btn');
+    btn.disabled = true;
+
+    const payload = {
+      icu_beds_available: parseInt(document.getElementById('count-icu').textContent, 10),
+      general_beds_available: parseInt(document.getElementById('count-general').textContent, 10),
+      ventilators_available: parseInt(document.getElementById('count-vent').textContent, 10),
+      status: document.getElementById('status-select').value,
+    };
+
+    try {
+      const res = await fetch(`/api/v1/hospitals/${currentHospital.id}/capacity`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        RESQ.playChime();
+        RESQ.toast('Capacity Saved', 'Updated hospital bed readiness', 'emerald');
+      }
+    } catch (e) {
+      RESQ.toast('Error', e.message, 'crimson');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function renderInboundCases(cases) {
+    const tbody = document.getElementById('inbound-cases-tbody');
+    const countBadge = document.getElementById('inbound-count-badge');
+    countBadge.textContent = `${cases.length} Inbound`;
+
+    if (cases.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="padding: 32px; text-align: center; color: #64748B;">
+            No inbound trauma cases currently routed to this trauma center.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = cases.map(c => `
+      <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
+        <td style="padding: 14px;">
+          <div style="font-weight: 700; color: #FFF;">${c.emergency_type || 'Cardiac Emergency'}</div>
+          <div style="font-size: 0.78rem; color: #94A3B8;">${c.pickup_address || 'Potheri, Chennai'}</div>
+        </td>
+        <td style="padding: 14px;">
+          <span class="badge badge-crimson">${c.priority || 'CRITICAL'}</span>
+        </td>
+        <td style="padding: 14px;">
+          <div style="font-weight: 700; color: #FFF;">${c.ambulance?.vehicle_number || 'TN-09-EM-1001'}</div>
+          <div style="font-size: 0.78rem; color: var(--cyan-400);">${c.ambulance?.ambulance_type || 'ALS ICU'}</div>
+        </td>
+        <td style="padding: 14px;">
+          <strong style="color: var(--cyan-400); font-family: var(--font-mono); font-size: 1rem;">~3 min</strong>
+        </td>
+        <td style="padding: 14px;">
+          <select class="input-field" style="font-size: 0.82rem; padding: 4px 8px; width: 160px;">
+            <option>Dr. Ananya Roy (ER Lead)</option>
+            <option>Dr. Vikram Patel (Trauma)</option>
+            <option>Dr. Rajesh Shenoy (Cardio)</option>
+          </select>
+        </td>
+        <td style="padding: 14px; text-align: right;">
+          <button onclick="confirmHandover('${c.id}')" class="btn btn-emerald btn-sm">
+            <span>✅ Confirm Handover</span>
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async function confirmHandover(emergencyId) {
+    try {
+      const res = await fetch(`/api/v1/hospitals/handover/${emergencyId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ doctor_name: 'Dr. Ananya Roy (ER Lead)' })
+      });
+      if (res.ok) {
+        RESQ.playChime();
+        RESQ.toast('Handover Complete', 'Patient transferred to ER care team', 'emerald');
+        if (currentHospital) loadHospitalData(currentHospital.id);
+      }
+    } catch (e) {
+      RESQ.toast('Error', e.message, 'crimson');
+    }
+  }
+</script>
+{% endblock %}

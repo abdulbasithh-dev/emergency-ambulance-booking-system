@@ -3,7 +3,7 @@ from typing import List
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "ResQ — Emergency Ambulance Tracking & Dispatch Platform"
+    PROJECT_NAME: str = "ResQ - Emergency Ambulance Tracking & Dispatch Platform"
     TAGLINE: str = "Every Second Matters."
     API_V1_STR: str = "/api"
     

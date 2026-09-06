@@ -4,6 +4,22 @@ Welcome to **ResQ**! This guide walks you through every feature of the platform,
 
 ---
 
+## ⚡ How to Run ResQ (100% Pure Python)
+
+ResQ runs natively in Python with zero Node.js dependencies:
+
+```bash
+# 1. Install dependencies
+pip install -r backend/requirements.txt
+
+# 2. Launch the full platform
+python run.py
+```
+
+Open your browser at **http://127.0.0.1:8000** to access the complete application!
+
+---
+
 ## 🚀 Quick Start: The 1-Click Live Simulation
 
 The easiest and fastest way to experience ResQ is the **1-Click Live Simulation**:

@@ -3,9 +3,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.api.router import api_router
+from app.api.pages import pages_router
 from app.websocket.connection_manager import manager
 from seed_data import seed
 
@@ -43,12 +47,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static assets
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
 # Mount REST API under both /api/v1 and /api for backwards compatibility
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(api_router, prefix="/api")
 
-@app.get("/")
-async def root():
+# Mount server-rendered UI page routes
+app.include_router(pages_router)
+
+@app.get("/api/status")
+async def api_status():
     return {
         "platform": settings.PROJECT_NAME,
         "tagline": settings.TAGLINE,

@@ -12,6 +12,8 @@ class DriverStatusUpdate(BaseModel):
     availability_status: AmbulanceStatus
 
 class AmbulanceBase(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     vehicle_number: str
     vehicle_type: AmbulanceType = AmbulanceType.ALS
     current_lat: float

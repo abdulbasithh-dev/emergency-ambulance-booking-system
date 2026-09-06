@@ -81,42 +81,38 @@
 
 ---
 
-## ⚡ Quickstart Guide
+### ⚡ Quickstart: 100% Pure Python Full-Stack (Recommended)
 
-### Option 1: Local Development Setup
+Run the entire platform natively in Python with zero Node.js/npm dependencies:
 
-#### 1. Backend Setup
 ```bash
-# Navigate to backend directory
-cd backend
+# 1. Install dependencies
+pip install -r backend/requirements.txt
 
-# Create and activate virtual environment (Windows PowerShell)
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Seed the database with demo ambulances, hospitals, and users
-python seed_data.py
-
-# Launch the FastAPI backend
-uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+# 2. Run the platform
+python run.py
 ```
-*API Swagger Documentation is available at: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)*
 
-#### 2. Frontend Setup
+- **Web Application & Dashboards**: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- **API Swagger Documentation**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+---
+
+### Option 2: Full-Stack with React Frontend (Legacy / Alternative)
+
+If you prefer to run the separated React 18 frontend:
+
 ```bash
-# In a new terminal, navigate to frontend directory
+# Terminal 1: Backend
+cd backend
+python -m uvicorn app.main:app --reload
+
+# Terminal 2: React Frontend
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start Vite development server
 npm run dev
 ```
-*Access the Web Application at: [http://localhost:5173](http://localhost:5173)*
+- React Frontend: [http://localhost:5173](http://localhost:5173)
 
 ---
 

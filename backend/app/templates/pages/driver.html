@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+
+{% block title %}Ambulance Driver Cockpit HUD — ResQ{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+
+  <!-- Driver Cockpit Header -->
+  <div class="glass-panel" style="padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div style="width: 46px; height: 46px; border-radius: 12px; background: rgba(245, 158, 11, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">
+        🚑
+      </div>
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h1 style="font-size: 1.25rem; color: #FFF; margin: 0;">Driver Cockpit HUD</h1>
+          <span id="shift-status-badge" class="badge badge-emerald">ON DUTY</span>
+        </div>
+        <div style="font-size: 0.8rem; color: #94A3B8;">Unit: <strong>TN-09-EM-1001</strong> &bull; ALS Advanced Mobile ICU</div>
+      </div>
+    </div>
+
+    <!-- On/Off Duty Shift Toggle -->
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <button id="shift-toggle-btn" class="btn btn-emerald btn-sm" onclick="toggleShiftStatus()">
+        <span>🟢 Available On Duty</span>
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="RESQ.stopSiren()">
+        <span>🔇 Mute Siren</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Incoming Dispatch Alert Banner (Flashing when assigned) -->
+  <div id="dispatch-alert-banner" class="glass-panel-glow" style="display: none; padding: 20px 24px; background: rgba(239, 68, 68, 0.15); border: 2px solid #EF4444; border-radius: 12px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <span class="pulsing-dot" style="width: 14px; height: 14px;"></span>
+        <div>
+          <div style="font-size: 1.2rem; font-weight: 800; color: #FFF; letter-spacing: 0.02em;">
+            🚨 PRIORITY EMERGENCY DISPATCH INCOMING!
+          </div>
+          <div id="incoming-incident-desc" style="font-size: 0.88rem; color: #FCA5A5; margin-top: 2px;">
+            Cardiac arrest at 41, Potheri SRM University Campus
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <button onclick="acceptDispatch()" class="btn btn-primary btn-lg" style="font-weight: 800; padding: 12px 28px;">
+          <span>✅ ACCEPT DISPATCH</span>
+        </button>
+        <button onclick="declineDispatch()" class="btn btn-outline btn-lg" style="padding: 12px 20px;">
+          <span>DECLINE</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mission Stage Stepper & Action Controls -->
+  <div id="driver-mission-card" class="glass-panel" style="padding: 24px; display: flex; flex-direction: column; gap: 18px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 14px;">
+      <div>
+        <div style="font-size: 0.78rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em;">Current Mission Phase</div>
+        <div id="driver-phase-text" style="font-size: 1.4rem; font-weight: 800; color: #FFF; font-family: var(--font-heading);">
+          STANDBY &bull; READY FOR DISPATCH
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <button id="mission-action-btn" class="btn btn-primary btn-lg" style="display: none;" onclick="advanceMissionStage()">
+          <span id="mission-action-label">Start Navigation</span>
+        </button>
+        <button id="diversion-trigger-btn" class="btn btn-danger-outline btn-sm" style="display: none;" onclick="openDiversionModal()">
+          <span>🏥 Request Hospital Diversion</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Incident Information Strip -->
+    <div id="driver-incident-strip" style="display: none; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; background: rgba(13, 19, 34, 0.6); padding: 16px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.06);">
+      <div>
+        <div style="font-size: 0.75rem; color: #94A3B8;">INCIDENT TYPE</div>
+        <div id="drv-type" style="font-weight: 700; color: #FFF; margin-top: 2px;">Cardiac Emergency</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: #94A3B8;">PICKUP LOCATION</div>
+        <div id="drv-pickup" style="font-weight: 700; color: #FFF; margin-top: 2px;">41, Potheri SRM Campus</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: #94A3B8;">CALLER CONTACT</div>
+        <div id="drv-phone" style="font-weight: 700; color: var(--cyan-400); margin-top: 2px;">+91 98765 43210</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: #94A3B8;">TARGET HOSPITAL ER</div>
+        <div id="drv-hospital" style="font-weight: 700; color: #10B981; margin-top: 2px;">Apollo Trauma Center</div>
+      </div>
+    </div>
+
+    <!-- Driver Tactical Map -->
+    <div style="position: relative; height: 460px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1);">
+      <div id="driver-cockpit-map" style="width: 100%; height: 100%;"></div>
+    </div>
+  </div>
+
+  <!-- Hospital Diversion Modal -->
+  <div id="diversion-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 9999; backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 20px;">
+    <div class="glass-panel" style="max-width: 500px; width: 100%; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+      <h3 style="font-size: 1.2rem; color: #FFF; display: flex; align-items: center; gap: 8px;">
+        <span>🏥 Request Hospital ER Diversion</span>
+      </h3>
+      <p style="font-size: 0.82rem; color: #94A3B8;">If target hospital ER is saturated or patient condition deteriorated, request an emergency reroute.</p>
+      
+      <div>
+        <label style="font-size: 0.8rem; color: #CBD5E1; margin-bottom: 6px; display: block;">Select Alternative Trauma Center</label>
+        <select id="diversion-hospital-select" class="input-field"></select>
+      </div>
+
+      <div>
+        <label style="font-size: 0.8rem; color: #CBD5E1; margin-bottom: 6px; display: block;">Reason for Diversion</label>
+        <textarea id="diversion-reason-input" class="input-field" rows="3" placeholder="e.g., Primary ER at full ICU capacity, patient requires urgent cath lab"></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+        <button onclick="closeDiversionModal()" class="btn btn-outline btn-sm">Cancel</button>
+        <button onclick="submitDiversionRequest()" class="btn btn-primary btn-sm">Transmit Diversion Request</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let driverMap = null;
+  let driverAmbulance = null;
+  let activeEmergency = null;
+  let driverMarker = null;
+  let targetMarker = null;
+  let isOnDuty = true;
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Initialize Leaflet
+    driverMap = RESQ_MAP.init('driver-cockpit-map', {
+      center: [12.8235, 80.0445],
+      zoom: 15,
+    });
+
+    // 2. Fetch driver data
+    await fetchDriverState();
+
+    // 3. Listen to WebSocket events
+    window.addEventListener('resq:msg', (e) => {
+      const msg = e.detail;
+      if (!msg) return;
+
+      if (msg.event === 'DISPATCH_REQUEST' || msg.event === 'NEW_DISPATCH_OFFER') {
+        RESQ.playSiren();
+        activeEmergency = msg.data;
+        renderIncomingAlert(msg.data);
+      } else if (msg.event === 'LOCATION_UPDATE' || msg.event === 'AMBULANCE_LOCATION_UPDATE') {
+        const d = msg.data || {};
+        const lat = d.latitude ?? d.current_latitude ?? d.current_lat;
+        const lng = d.longitude ?? d.current_longitude ?? d.current_lng;
+        if (lat && lng) {
+          updateDriverMarker(lat, lng, d.heading || 0);
+        }
+      } else if (msg.event === 'STATUS_CHANGE' || msg.event === 'EMERGENCY_STATUS_UPDATED') {
+        fetchDriverState();
+      } else if (msg.event === 'SIMULATION_STARTED') {
+        fetchDriverState();
+      }
+    });
+
+    // Periodic poll
+    setInterval(fetchDriverState, 3000);
+  });
+
+  async function fetchDriverState() {
+    try {
+      const [ambRes, emRes] = await Promise.all([
+        fetch('/api/v1/ambulances/').then(r => r.json()),
+        fetch('/api/v1/emergencies/active').then(r => r.ok ? r.json() : null),
+      ]);
+
+      if (ambRes && ambRes.length > 0) {
+        driverAmbulance = ambRes[0];
+        const lat = driverAmbulance.current_latitude || driverAmbulance.current_lat || 12.8235;
+        const lng = driverAmbulance.current_longitude || driverAmbulance.current_lng || 80.0445;
+        updateDriverMarker(lat, lng, driverAmbulance.current_heading || 0);
+      }
+
+      if (emRes && emRes.id) {
+        activeEmergency = emRes;
+        renderActiveEmergency(emRes);
+      } else {
+        activeEmergency = null;
+        renderStandby();
+      }
+    } catch (e) {
+      console.warn('Driver state fetch error', e);
+    }
+  }
+
+  function updateDriverMarker(lat, lng, heading = 0) {
+    if (!driverMarker) {
+      driverMarker = L.marker([lat, lng], {
+        icon: RESQ_MAP.createAmbulanceIcon({ current_heading: heading, id: 'drv' }, true)
+      }).addTo(driverMap);
+    } else {
+      driverMarker.setLatLng([lat, lng]);
+      const rotateBox = driverMarker.getElement()?.querySelector('.vehicle-rotate-box');
+      if (rotateBox) rotateBox.style.transform = `rotate(${heading}deg)`;
+    }
+    driverMap.panTo([lat, lng], { animate: true, duration: 1.0 });
+  }
+
+  function renderIncomingAlert(data) {
+    document.getElementById('dispatch-alert-banner').style.display = 'block';
+    document.getElementById('incoming-incident-desc').textContent = `${data.emergency_type || 'Emergency'} at ${data.pickup_address || 'Patient Coordinates'}`;
+  }
+
+  function renderStandby() {
+    document.getElementById('dispatch-alert-banner').style.display = 'none';
+    document.getElementById('driver-incident-strip').style.display = 'none';
+    document.getElementById('mission-action-btn').style.display = 'none';
+    document.getElementById('diversion-trigger-btn').style.display = 'none';
+    document.getElementById('driver-phase-text').textContent = 'STANDBY • READY FOR DISPATCH';
+    document.getElementById('driver-phase-text').style.color = '#94A3B8';
+    if (targetMarker) {
+      driverMap.removeLayer(targetMarker);
+      targetMarker = null;
+    }
+  }
+
+  function renderActiveEmergency(em) {
+    document.getElementById('driver-incident-strip').style.display = 'grid';
+    document.getElementById('drv-type').textContent = em.emergency_type || 'Cardiac Emergency';
+    document.getElementById('drv-pickup').textContent = em.pickup_address || 'Potheri, Chennai';
+    document.getElementById('drv-phone').textContent = em.contact_phone || '+91 98765 43210';
+    document.getElementById('drv-hospital').textContent = em.hospital?.name || 'Apollo Trauma Center';
+
+    const status = em.status || 'ASSIGNED';
+    document.getElementById('driver-phase-text').textContent = status.replace(/_/g, ' ');
+    document.getElementById('driver-phase-text').style.color = '#EF4444';
+
+    const actionBtn = document.getElementById('mission-action-btn');
+    const label = document.getElementById('mission-action-label');
+    const divBtn = document.getElementById('diversion-trigger-btn');
+
+    actionBtn.style.display = 'inline-flex';
+
+    if (status === 'ASSIGNED' || status === 'AMBULANCE_ASSIGNED') {
+      renderIncomingAlert(em);
+      label.textContent = 'Accept Dispatch';
+      divBtn.style.display = 'none';
+    } else if (status === 'DRIVER_ACCEPTED' || status === 'ACCEPTED') {
+      document.getElementById('dispatch-alert-banner').style.display = 'none';
+      label.textContent = 'Start Navigation to Patient';
+      divBtn.style.display = 'none';
+    } else if (status === 'AMBULANCE_EN_ROUTE' || status === 'EN_ROUTE_TO_PICKUP') {
+      document.getElementById('dispatch-alert-banner').style.display = 'none';
+      label.textContent = 'Confirm Arrived at Scene';
+      divBtn.style.display = 'none';
+    } else if (status === 'ARRIVED_AT_SCENE' || status === 'ARRIVED_AT_PICKUP') {
+      label.textContent = 'Confirm Patient Loaded';
+      divBtn.style.display = 'none';
+    } else if (status === 'PATIENT_LOADED' || status === 'PATIENT_ONBOARD') {
+      label.textContent = 'Start Transit to Hospital ER';
+      divBtn.style.display = 'inline-flex';
+    } else if (status === 'IN_TRANSIT_TO_HOSPITAL' || status === 'EN_ROUTE_TO_HOSPITAL') {
+      label.textContent = 'Confirm Arrived at Hospital ER';
+      divBtn.style.display = 'inline-flex';
+    } else if (status === 'ARRIVED_AT_HOSPITAL') {
+      label.textContent = 'Complete ER Handover';
+      divBtn.style.display = 'none';
+    } else if (status === 'HANDOVER_COMPLETE') {
+      actionBtn.style.display = 'none';
+      divBtn.style.display = 'none';
+      document.getElementById('driver-phase-text').textContent = 'MISSION COMPLETE • RETURNING TO BASE';
+      document.getElementById('driver-phase-text').style.color = '#10B981';
+    }
+  }
+
+  async function advanceMissionStage() {
+    if (!activeEmergency) return;
+    const status = activeEmergency.status;
+    let nextStatus = '';
+
+    if (status === 'ASSIGNED' || status === 'AMBULANCE_ASSIGNED') {
+      await acceptDispatch();
+      return;
+    } else if (status === 'DRIVER_ACCEPTED' || status === 'ACCEPTED') {
+      nextStatus = 'AMBULANCE_EN_ROUTE';
+    } else if (status === 'AMBULANCE_EN_ROUTE' || status === 'EN_ROUTE_TO_PICKUP') {
+      nextStatus = 'ARRIVED_AT_SCENE';
+    } else if (status === 'ARRIVED_AT_SCENE' || status === 'ARRIVED_AT_PICKUP') {
+      nextStatus = 'PATIENT_LOADED';
+    } else if (status === 'PATIENT_LOADED' || status === 'PATIENT_ONBOARD') {
+      nextStatus = 'IN_TRANSIT_TO_HOSPITAL';
+    } else if (status === 'IN_TRANSIT_TO_HOSPITAL' || status === 'EN_ROUTE_TO_HOSPITAL') {
+      nextStatus = 'ARRIVED_AT_HOSPITAL';
+    } else if (status === 'ARRIVED_AT_HOSPITAL') {
+      nextStatus = 'HANDOVER_COMPLETE';
+    }
+
+    if (nextStatus) {
+      try {
+        const res = await fetch(`/api/v1/emergencies/${activeEmergency.id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: nextStatus })
+        });
+        if (res.ok) {
+          RESQ.playChime();
+          RESQ.toast('Stage Advanced', `Status: ${nextStatus.replace(/_/g, ' ')}`, 'emerald');
+          fetchDriverState();
+        }
+      } catch (e) {
+        RESQ.toast('Error', e.message, 'crimson');
+      }
+    }
+  }
+
+  async function acceptDispatch() {
+    RESQ.stopSiren();
+    document.getElementById('dispatch-alert-banner').style.display = 'none';
+    if (!activeEmergency) return;
+
+    try {
+      const res = await fetch(`/api/v1/emergencies/${activeEmergency.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'DRIVER_ACCEPTED' })
+      });
+      if (res.ok) {
+        RESQ.toast('Dispatch Accepted', 'En route to patient pickup', 'emerald');
+        fetchDriverState();
+      }
+    } catch (e) {
+      RESQ.toast('Error', e.message, 'crimson');
+    }
+  }
+
+  async function declineDispatch() {
+    RESQ.stopSiren();
+    document.getElementById('dispatch-alert-banner').style.display = 'none';
+    RESQ.toast('Dispatch Declined', 'Re-routing to next available unit', 'amber');
+  }
+
+  function toggleShiftStatus() {
+    isOnDuty = !isOnDuty;
+    const btn = document.getElementById('shift-toggle-btn');
+    const badge = document.getElementById('shift-status-badge');
+    if (isOnDuty) {
+      btn.className = 'btn btn-emerald btn-sm';
+      btn.innerHTML = '<span>🟢 Available On Duty</span>';
+      badge.className = 'badge badge-emerald';
+      badge.textContent = 'ON DUTY';
+      RESQ.toast('Shift Status', 'Unit is online and available for dispatch', 'emerald');
+    } else {
+      btn.className = 'btn btn-outline btn-sm';
+      btn.innerHTML = '<span>⚪ Off Duty / Idle</span>';
+      badge.className = 'badge badge-amber';
+      badge.textContent = 'OFF DUTY';
+      RESQ.toast('Shift Status', 'Unit set to off duty', 'amber');
+    }
+  }
+
+  async function openDiversionModal() {
+    try {
+      const res = await fetch('/api/v1/hospitals/');
+      const hospitals = await res.json();
+      const sel = document.getElementById('diversion-hospital-select');
+      sel.innerHTML = hospitals.map(h => `<option value="${h.id}">${h.name} (ICU: ${h.icu_beds_available})</option>`).join('');
+      document.getElementById('diversion-modal').style.display = 'flex';
+    } catch (e) {
+      RESQ.toast('Error', 'Failed to fetch hospitals', 'crimson');
+    }
+  }
+
+  function closeDiversionModal() {
+    document.getElementById('diversion-modal').style.display = 'none';
+  }
+
+  async function submitDiversionRequest() {
+    if (!activeEmergency) return;
+    const targetHospId = document.getElementById('diversion-hospital-select').value;
+    const reason = document.getElementById('diversion-reason-input').value;
+
+    try {
+      const res = await fetch('/api/v1/dispatch/request-hospital-diversion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emergency_id: activeEmergency.id,
+          target_hospital_id: targetHospId,
+          reason: reason || 'Driver requested reroute due to ICU bed shortage'
+        })
+      });
+      if (res.ok) {
+        closeDiversionModal();
+        RESQ.toast('Diversion Transmitted', 'Dispatcher notified to review hospital change', 'emerald');
+      }
+    } catch (e) {
+      RESQ.toast('Error', e.message, 'crimson');
+    }
+  }
+</script>
+{% endblock %}

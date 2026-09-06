@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ project_name }} — Real-Time Emergency Ambulance Tracking & Dispatch{% endblock %}</title>
+  <meta name="description" content="AI-Powered Real-Time Emergency Ambulance Dispatch and Fleet Tracking Platform. Built with Python, FastAPI, WebSockets, and Leaflet.">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+
+  <!-- Modern Typography (Google Fonts) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- ResQ Design System & Custom CSS -->
+  <link rel="stylesheet" href="/static/css/resq.css">
+
+  <style>
+    /* Demo Navigation Bar Active Pill Styling */
+    .demo-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 10px 24px;
+      background: rgba(11, 17, 33, 0.94);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      position: sticky;
+      top: 0;
+      z-index: 2000;
+    }
+    .demo-role-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: #94A3B8;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .demo-role-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #FFF;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .demo-role-btn.active {
+      background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+      color: #FFF;
+      border-color: #EF4444;
+      box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4);
+    }
+    .app-footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 24px 28px;
+      background: rgba(8, 13, 26, 0.95);
+      color: #94A3B8;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: auto;
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  <!-- Top Sticky Demo Role Bar -->
+  <header class="demo-bar">
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <a href="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
+        <div style="width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, #EF4444, #DC2626); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);">
+          <span style="font-size: 1.2rem; line-height: 1;">🚑</span>
+        </div>
+        <div>
+          <div style="font-family: var(--font-heading); font-weight: 800; font-size: 1.15rem; color: #FFF; letter-spacing: -0.02em; display: flex; align-items: center; gap: 6px;">
+            <span>ResQ</span>
+            <span class="badge badge-crimson" style="font-size: 0.65rem; padding: 2px 6px;">Python</span>
+          </div>
+          <div style="font-size: 0.72rem; color: #94A3B8; margin-top: -3px;">Every Second Matters</div>
+        </div>
+      </a>
+
+      <!-- Role Switcher Pills -->
+      <nav style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+        <a href="/" class="demo-role-btn {% if active_page == 'portal' %}active{% endif %}" data-path="/" onclick="RESQ.switchRole('PORTAL', '/'); return false;">
+          <span>🌟</span> Front Portal
+        </a>
+        <a href="/citizen" class="demo-role-btn {% if active_page == 'citizen' %}active{% endif %}" data-path="/citizen" onclick="RESQ.switchRole('CITIZEN', '/citizen'); return false;">
+          <span>👤</span> Citizen SOS
+        </a>
+        <a href="/driver" class="demo-role-btn {% if active_page == 'driver' %}active{% endif %}" data-path="/driver" onclick="RESQ.switchRole('AMBULANCE_DRIVER', '/driver'); return false;">
+          <span>🚑</span> Driver HUD
+        </a>
+        <a href="/hospital" class="demo-role-btn {% if active_page == 'hospital' %}active{% endif %}" data-path="/hospital" onclick="RESQ.switchRole('HOSPITAL_STAFF', '/hospital'); return false;">
+          <span>🏥</span> Hospital ER
+        </a>
+        <a href="/dispatcher" class="demo-role-btn {% if active_page == 'dispatcher' %}active{% endif %}" data-path="/dispatcher" onclick="RESQ.switchRole('DISPATCHER', '/dispatcher'); return false;">
+          <span>🎧</span> Dispatcher
+        </a>
+        <a href="/admin" class="demo-role-btn {% if active_page == 'admin' %}active{% endif %}" data-path="/admin" onclick="RESQ.switchRole('ADMIN', '/admin'); return false;">
+          <span>🛡️</span> Admin
+        </a>
+      </nav>
+    </div>
+
+    <!-- Live Status & Simulation Trigger -->
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #94A3B8; padding: 5px 12px; background: rgba(255,255,255,0.05); border-radius: 9999px; border: 1px solid rgba(255,255,255,0.08);">
+        <span id="ws-status-dot" class="pulsing-dot emerald"></span>
+        <span id="ws-status-text">WS Live</span>
+      </div>
+
+      <button id="global-sim-btn" class="btn btn-emerald btn-sm" style="font-size: 0.82rem; font-weight: 700;">
+        <span>▶ 1-Click Live Simulation</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content View -->
+  <main style="min-height: calc(100vh - 130px);">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Global Footer -->
+  <footer class="app-footer">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="font-weight: 700; color: #FFF;">ResQ</span> &bull; Production-Grade Emergency Dispatch & Ambulance Fleet Intelligence.
+    </div>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <a href="/docs" target="_blank" style="color: var(--cyan-400); font-size: 0.82rem;">⚡ Swagger API Docs</a>
+      <span style="color: rgba(255,255,255,0.2);">&bull;</span>
+      <span style="color: #94A3B8; font-size: 0.82rem;">Emergency Helpline: <strong style="color:#EF4444;">108</strong></span>
+      <span style="color: rgba(255,255,255,0.2);">&bull;</span>
+      <span style="color: #64748B; font-size: 0.8rem;">100% Pure Python Powered</span>
+    </div>
+  </footer>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
+  <!-- ResQ Core Scripts -->
+  <script src="/static/js/resq-core.js"></script>
+  <script src="/static/js/resq-map.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
