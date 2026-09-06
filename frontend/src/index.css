@@ -1,0 +1,836 @@
+/* ==========================================================================
+   ResQ Design System & Global Styles
+   "Every Second Matters."
+   Emergency Response Command & Dispatch Theme
+   ========================================================================== */
+
+:root {
+  /* Color Palette - Emergency Dark Mode */
+  --bg-primary: #070B14;
+  --bg-secondary: #0D1322;
+  --bg-surface: #141D30;
+  --bg-card: rgba(20, 29, 48, 0.75);
+  --bg-card-hover: rgba(28, 40, 65, 0.85);
+  --bg-glass: rgba(13, 19, 34, 0.75);
+
+  /* Borders & Dividers */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.15);
+  --border-focus: #3B82F6;
+
+  /* Accent Colors */
+  --crimson-500: #EF4444;
+  --crimson-600: #DC2626;
+  --crimson-glow: rgba(239, 68, 68, 0.35);
+
+  --coral-500: #F97316;
+  --coral-glow: rgba(249, 115, 22, 0.3);
+
+  --amber-500: #F59E0B;
+  --amber-glow: rgba(245, 158, 11, 0.3);
+
+  --emerald-500: #10B981;
+  --emerald-600: #059669;
+  --emerald-glow: rgba(16, 185, 129, 0.3);
+
+  --cyan-400: #22D3EE;
+  --cyan-500: #06B6D4;
+  --cyan-glow: rgba(6, 182, 212, 0.3);
+
+  --blue-500: #3B82F6;
+  --blue-600: #2563EB;
+  --blue-glow: rgba(59, 130, 246, 0.3);
+
+  --indigo-500: #6366F1;
+  --indigo-glow: rgba(99, 102, 241, 0.3);
+
+  /* Typography Colors */
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --text-inverse: #070B14;
+
+  /* Elevation Shadows & Glass */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.6);
+  --shadow-emergency: 0 0 25px rgba(239, 68, 68, 0.4);
+  --shadow-glow-cyan: 0 0 25px rgba(6, 182, 212, 0.35);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Typography */
+  --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 350ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Reset & Box Sizing */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100%;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Typography styles */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+h1 { font-size: 2.5rem; line-height: 1.2; }
+h2 { font-size: 1.85rem; line-height: 1.25; }
+h3 { font-size: 1.35rem; line-height: 1.3; }
+h4 { font-size: 1.1rem; line-height: 1.4; }
+
+p {
+  color: var(--text-secondary);
+}
+
+a {
+  color: var(--cyan-400);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--cyan-500);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.glass-panel-subtle {
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.glass-panel-glow {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  box-shadow: var(--shadow-emergency);
+  border-radius: var(--radius-lg);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-family: var(--font-heading);
+  font-size: 0.92rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--crimson-500), var(--crimson-600));
+  color: #FFF;
+  box-shadow: 0 4px 15px var(--crimson-glow);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #F87171, var(--crimson-500));
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-emerald {
+  background: linear-gradient(135deg, var(--emerald-500), var(--emerald-600));
+  color: #FFF;
+  box-shadow: 0 4px 15px var(--emerald-glow);
+}
+
+.btn-emerald:hover {
+  background: linear-gradient(135deg, #34D399, var(--emerald-500));
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-cyan {
+  background: linear-gradient(135deg, var(--cyan-400), var(--cyan-500));
+  color: #070B14;
+  font-weight: 700;
+  box-shadow: 0 4px 15px var(--cyan-glow);
+}
+
+.btn-cyan:hover {
+  background: linear-gradient(135deg, #67E8F9, var(--cyan-400));
+  box-shadow: 0 6px 20px rgba(6, 182, 212, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-outline {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-danger-outline {
+  background: rgba(239, 68, 68, 0.1);
+  color: #FCA5A5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.btn-danger-outline:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: var(--crimson-500);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  border-radius: var(--radius-sm);
+}
+
+.btn-lg {
+  padding: 14px 28px;
+  font-size: 1.05rem;
+  border-radius: var(--radius-lg);
+}
+
+/* Badges and status pills */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: var(--radius-full);
+}
+
+.badge-crimson {
+  background: rgba(239, 68, 68, 0.15);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge-emerald {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-amber {
+  background: rgba(245, 158, 11, 0.15);
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-cyan {
+  background: rgba(6, 182, 212, 0.15);
+  color: #22D3EE;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.badge-blue {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60A5FA;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.badge-purple {
+  background: rgba(168, 85, 247, 0.15);
+  color: #C084FC;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+/* Live Pulsing Radar Beacon */
+.pulsing-dot {
+  width: 10px;
+  height: 10px;
+  background-color: var(--crimson-500);
+  border-radius: 50%;
+  position: relative;
+  display: inline-block;
+}
+
+.pulsing-dot::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: var(--crimson-500);
+  opacity: 0.6;
+  animation: pulse-beacon 1.8s infinite ease-out;
+}
+
+.pulsing-dot.emerald {
+  background-color: var(--emerald-500);
+}
+.pulsing-dot.emerald::after {
+  background-color: var(--emerald-500);
+}
+
+@keyframes pulse-beacon {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* Form Inputs */
+.input-field {
+  width: 100%;
+  background: rgba(13, 19, 34, 0.7);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  transition: all var(--transition-fast);
+  outline: none;
+}
+
+.input-field:focus {
+  border-color: var(--cyan-400);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.2);
+}
+
+.input-field::placeholder {
+  color: var(--text-muted);
+}
+
+select.input-field option {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+/* Leaflet Dark Customizations */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #0d1322 !important;
+  font-family: var(--font-body) !important;
+  border-radius: inherit;
+}
+
+.leaflet-tile {
+  filter: brightness(0.65) invert(1) contrast(3) hue-rotate(200deg) saturate(0.35) brightness(0.7);
+}
+
+.leaflet-popup-content-wrapper {
+  background: rgba(20, 29, 48, 0.95) !important;
+  color: var(--text-primary) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.leaflet-popup-tip {
+  background: rgba(20, 29, 48, 0.95) !important;
+}
+
+.leaflet-popup-close-button {
+  color: var(--text-secondary) !important;
+}
+
+/* Top Demo Bar */
+.demo-bar {
+  background: linear-gradient(90deg, #111827 0%, #1E1B4B 50%, #111827 100%);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.3);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+}
+
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 380px;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   Top-Down 3D Vehicle & Modern Navigation Map Styles (Rapido/Uber Theme)
+   ========================================================================== */
+
+/* Alternating Dual Emergency Strobes */
+.ambulance-strobe-red {
+  animation: strobe-flash-red 0.55s infinite alternate ease-in-out;
+}
+
+.ambulance-strobe-blue {
+  animation: strobe-flash-blue 0.55s infinite alternate ease-in-out;
+}
+
+@keyframes strobe-flash-red {
+  0%, 40% {
+    fill: #EF4444;
+    filter: drop-shadow(0 0 6px #EF4444);
+    opacity: 1;
+  }
+  50%, 100% {
+    fill: #7F1D1D;
+    filter: none;
+    opacity: 0.25;
+  }
+}
+
+@keyframes strobe-flash-blue {
+  0%, 40% {
+    fill: #1E3A8A;
+    filter: none;
+    opacity: 0.25;
+  }
+  50%, 100% {
+    fill: #38BDF8;
+    filter: drop-shadow(0 0 6px #38BDF8);
+    opacity: 1;
+  }
+}
+
+/* Assigned Ambulance Emergency Halo Beacon */
+.ambulance-siren-halo {
+  position: absolute;
+  width: 58px;
+  height: 94px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(239, 68, 68, 0.35) 0%, rgba(56, 189, 248, 0.2) 60%, transparent 100%);
+  border: 1.5px dashed rgba(239, 68, 68, 0.6);
+  animation: pulse-siren-halo 1.2s infinite ease-out;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes pulse-siren-halo {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+/* Smooth Vehicle Marker Gliding & Orientation Transition */
+.leaflet-marker-icon.custom-topdown-ambulance-marker {
+  background: transparent !important;
+  border: none !important;
+  transition: top 1.8s linear, left 1.8s linear;
+  will-change: transform, top, left;
+}
+
+/* Modern Pickup Pin Radar Waves (Matching Screenshot) */
+.pickup-radar-ring {
+  position: absolute;
+  top: 48px;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid #10B981;
+  pointer-events: none;
+}
+
+.pickup-radar-ring.ring-1 {
+  width: 32px;
+  height: 32px;
+  animation: pickup-radar-wave 2.2s infinite ease-out;
+}
+
+.pickup-radar-ring.ring-2 {
+  width: 32px;
+  height: 32px;
+  animation: pickup-radar-wave 2.2s infinite ease-out 1.1s;
+}
+
+@keyframes pickup-radar-wave {
+  0% {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.8);
+    opacity: 0;
+  }
+}
+
+/* Modern Floating Map Style Selector Pill */
+.map-style-toggle-bar {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  padding: 3px 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.map-style-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.map-style-btn:hover {
+  color: #F8FAFC;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.map-style-btn.active {
+  background: #3B82F6;
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+}
+
+/* ==========================================================================
+   Life Care Front Dashboard & Portal Styles (Matching Reference)
+   ========================================================================== */
+
+.lifecare-portal {
+  font-family: var(--font-sans);
+  background-color: #080D1A;
+  color: #F8FAFC;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sticky Life Care Navigation */
+.lifecare-header {
+  background: rgba(8, 13, 26, 0.95);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  padding: 14px 28px;
+}
+
+.lifecare-nav-link {
+  color: #94A3B8;
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  position: relative;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.lifecare-nav-link:hover {
+  color: #FFFFFF;
+}
+
+.lifecare-nav-link.active {
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.lifecare-nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 2px;
+  background: #EF4444;
+  border-radius: 2px;
+}
+
+.lifecare-phone-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.lifecare-phone-pill:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.lifecare-btn-red {
+  background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+  color: #FFFFFF;
+  border: none;
+  font-weight: 700;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 18px rgba(239, 68, 68, 0.4);
+}
+
+.lifecare-btn-red:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 26px rgba(239, 68, 68, 0.55);
+  background: linear-gradient(135deg, #F87171 0%, #EF4444 100%);
+}
+
+.lifecare-btn-outline {
+  background: rgba(255, 255, 255, 0.05);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.lifecare-btn-outline:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Floating Trust Bar Overlapping Hero */
+.lifecare-trust-bar {
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 22px 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  position: relative;
+  z-index: 20;
+  margin-top: -46px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.lifecare-trust-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1 1 180px;
+}
+
+.lifecare-trust-icon-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #EF4444;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+  transition: transform 0.2s ease;
+}
+
+.lifecare-trust-item:hover .lifecare-trust-icon-circle {
+  transform: scale(1.08);
+}
+
+/* Clean Services Section */
+.lifecare-services-section {
+  background: #F8FAFC;
+  color: #0F172A;
+  padding: 60px 24px 70px;
+  position: relative;
+}
+
+.lifecare-service-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.lifecare-service-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.lifecare-service-card img {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 12px;
+  transition: transform 0.4s ease;
+}
+
+.lifecare-service-card:hover img {
+  transform: scale(1.03);
+}
+
+/* Track Ambulance Navy Banner */
+.lifecare-track-banner {
+  background: linear-gradient(135deg, #091124 0%, #0D1B3A 100%);
+  border-radius: 16px;
+  padding: 28px 36px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+
