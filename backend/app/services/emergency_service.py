@@ -189,8 +189,25 @@ class EmergencyService:
 
         # If the assigned ambulance has no driver, auto-link an active driver
         if not ambulance.driver_id:
-            driver_stmt = select(User).where(User.role == UserRole.AMBULANCE_DRIVER).order_by(User.id.asc())
-            driver_user = (await db.execute(driver_stmt)).scalars().first()
+            # First look for a driver not currently attached to another ambulance
+            unassigned_stmt = (
+                select(User)
+                .outerjoin(Ambulance, User.id == Ambulance.driver_id)
+                .where(User.role == UserRole.AMBULANCE_DRIVER, Ambulance.id.is_(None))
+                .order_by(User.id.asc())
+            )
+            driver_user = (await db.execute(unassigned_stmt)).scalars().first()
+            if not driver_user:
+                # Fallback: select any driver
+                fallback_stmt = select(User).where(User.role == UserRole.AMBULANCE_DRIVER).order_by(User.id.asc())
+                driver_user = (await db.execute(fallback_stmt)).scalars().first()
+                if driver_user:
+                    from sqlalchemy import update
+                    await db.execute(
+                        update(Ambulance)
+                        .where(Ambulance.driver_id == driver_user.id)
+                        .values(driver_id=None)
+                    )
             if driver_user:
                 ambulance.driver_id = driver_user.id
                 ambulance.driver = driver_user

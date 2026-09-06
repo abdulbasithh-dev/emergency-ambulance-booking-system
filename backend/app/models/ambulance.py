@@ -10,7 +10,7 @@ class Ambulance(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     vehicle_number = Column(String(50), unique=True, index=True, nullable=False)
     vehicle_type = Column(SAEnum(AmbulanceType), default=AmbulanceType.ALS, nullable=False)
-    driver_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=True)
+    driver_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     
     current_lat = Column(Float, nullable=False, default=12.9010)
     current_lng = Column(Float, nullable=False, default=80.2279)
