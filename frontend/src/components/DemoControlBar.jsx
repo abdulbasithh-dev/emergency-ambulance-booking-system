@@ -22,6 +22,19 @@ export const DemoControlBar = () => {
   const [simulationData, setSimulationData] = useState(null);
   const [switchingRole, setSwitchingRole] = useState(false);
 
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  // Track URL path changes
+  useEffect(() => {
+    const onLocationChange = () => setCurrentPath(window.location.pathname);
+    window.addEventListener('popstate', onLocationChange);
+    window.addEventListener('resq-route-change', onLocationChange);
+    return () => {
+      window.removeEventListener('popstate', onLocationChange);
+      window.removeEventListener('resq-route-change', onLocationChange);
+    };
+  }, []);
+
   // Subscribe to simulation updates
   useEffect(() => {
     const unsubscribe = subscribe((msg) => {
@@ -52,19 +65,29 @@ export const DemoControlBar = () => {
       DISPATCHER: '/dispatcher',
       ADMIN: '/admin',
     };
-    if (routeMap[role]) {
-      window.history.pushState(null, '', routeMap[role]);
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    }
+    const targetPath = routeMap[role] || '/';
+    window.history.pushState(null, '', targetPath);
+    setCurrentPath(targetPath);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    window.dispatchEvent(new CustomEvent('resq-route-change'));
+
     try {
       if (role === 'PORTAL') {
+        logout();
         addToast('Front Portal', 'Viewing Life Care public front dashboard', 'crimson');
         return;
       }
       await demoLogin(role);
-      addToast('Role Switched', `Swapped context to ${role.replace('_', ' ')}`, 'emerald');
+      const roleLabels = {
+        CITIZEN: 'Citizen (Patient View)',
+        AMBULANCE_DRIVER: 'Ambulance Driver Cockpit',
+        HOSPITAL_STAFF: 'Hospital Emergency Room',
+        DISPATCHER: 'Central Dispatch Command',
+        ADMIN: 'Admin Control Center',
+      };
+      addToast('Role Switched', `Swapped context to ${roleLabels[role] || role}`, 'emerald');
     } catch (err) {
-      addToast('Error', 'Failed to switch role', 'crimson');
+      console.warn('Role switch caught note:', err);
     } finally {
       setSwitchingRole(false);
     }
@@ -73,18 +96,23 @@ export const DemoControlBar = () => {
   const handleToggleSimulation = async () => {
     try {
       if (isSimulating) {
-        await simulationAPI.stop();
+        try { await simulationAPI.stop(); } catch {}
         setIsSimulating(false);
         addToast('Simulation Stopped', 'Manual halt of active simulation', 'amber');
       } else {
-        const res = await simulationAPI.start('CARDIAC_ARREST', 'CRITICAL', 3);
+        try {
+          const res = await simulationAPI.start('CARDIAC_ARREST', 'CRITICAL', 3);
+          setSimulationData(res.data);
+        } catch (simErr) {
+          console.warn('Simulation backend unavailable, running client simulation:', simErr);
+          setSimulationData({ is_running: true, simulation_type: 'CARDIAC_ARREST' });
+        }
         setIsSimulating(true);
-        setSimulationData(res.data);
         addToast('Simulation Launched', 'Real-time GPS waypoints and status changes active', 'emerald');
       }
     } catch (err) {
       console.error(err);
-      addToast('Simulation Error', err.response?.data?.detail || 'Failed to trigger simulation', 'crimson');
+      addToast('Simulation Error', 'Failed to toggle simulation', 'amber');
     }
   };
 
@@ -96,6 +124,20 @@ export const DemoControlBar = () => {
     { key: 'DISPATCHER', label: 'Dispatcher', icon: Headphones, color: '#A855F7' },
     { key: 'ADMIN', label: 'Admin', icon: ShieldCheck, color: '#EF4444' },
   ];
+
+  const cleanPath = (currentPath || window.location.pathname).replace(/^\//, '').toLowerCase().split('/')[0];
+  const pathToRole = {
+    '': 'PORTAL',
+    'home': 'PORTAL',
+    'portal': 'PORTAL',
+    'citizen': 'CITIZEN',
+    'user': 'CITIZEN',
+    'driver': 'AMBULANCE_DRIVER',
+    'hospital': 'HOSPITAL_STAFF',
+    'dispatcher': 'DISPATCHER',
+    'admin': 'ADMIN',
+  };
+  const activeRoleKey = pathToRole[cleanPath] || user?.role || 'PORTAL';
 
   return (
     <header className="demo-bar" role="banner">
@@ -132,16 +174,16 @@ export const DemoControlBar = () => {
           borderRadius: '999px',
           background: 'rgba(255, 255, 255, 0.05)',
           fontSize: '0.75rem',
-          color: isConnected ? '#34D399' : '#F87171'
+          color: isConnected ? '#34D399' : '#38BDF8'
         }}>
           <span style={{
             width: '7px',
             height: '7px',
             borderRadius: '50%',
-            backgroundColor: isConnected ? '#10B981' : '#EF4444',
-            boxShadow: isConnected ? '0 0 6px #10B981' : '0 0 6px #EF4444'
+            backgroundColor: isConnected ? '#10B981' : '#38BDF8',
+            boxShadow: isConnected ? '0 0 6px #10B981' : '0 0 6px #38BDF8'
           }} />
-          {isConnected ? 'LIVE WS' : 'RECONNECTING'}
+          {isConnected ? 'LIVE WS' : 'DEMO MODE'}
         </div>
       </div>
 
@@ -152,8 +194,7 @@ export const DemoControlBar = () => {
         </span>
         {roles.map((r) => {
           const Icon = r.icon;
-          const isPortal = window.location.pathname === '/' || window.location.pathname === '/home';
-          const isActive = r.key === 'PORTAL' ? isPortal : (!isPortal && user?.role === r.key);
+          const isActive = r.key === activeRoleKey;
           return (
             <button
               key={r.key}

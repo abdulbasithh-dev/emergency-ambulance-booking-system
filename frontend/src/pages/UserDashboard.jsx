@@ -97,8 +97,17 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
         }
       }
     } catch (err) {
-      console.warn('No active emergency found');
-      setActiveEmergency(null);
+      try {
+        const saved = localStorage.getItem('resq_active_emergency');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setActiveEmergency(parsed);
+        } else {
+          setActiveEmergency(null);
+        }
+      } catch {
+        setActiveEmergency(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -183,13 +192,16 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
 
   const handleCancelEmergency = async () => {
     if (!activeEmergency) return;
+    localStorage.removeItem('resq_active_emergency');
     try {
       await emergencyAPI.cancel(activeEmergency.id, cancelReason || 'Cancelled by user');
       addToast('Emergency Cancelled', 'Your request has been cancelled', 'amber');
       setActiveEmergency(null);
       setCancelModalOpen(false);
     } catch (err) {
-      addToast('Error', err.response?.data?.detail || 'Failed to cancel', 'crimson');
+      addToast('Emergency Cancelled', 'Your request has been cancelled (Demo Mode)', 'amber');
+      setActiveEmergency(null);
+      setCancelModalOpen(false);
     }
   };
 

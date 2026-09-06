@@ -66,15 +66,17 @@ const MainLayout = () => {
   React.useEffect(() => {
     const onLocationChange = () => setCurrentPath(window.location.pathname);
     window.addEventListener('popstate', onLocationChange);
-    return () => window.removeEventListener('popstate', onLocationChange);
+    window.addEventListener('resq-route-change', onLocationChange);
+    return () => {
+      window.removeEventListener('popstate', onLocationChange);
+      window.removeEventListener('resq-route-change', onLocationChange);
+    };
   }, []);
 
-  // Initial URL route synchronization on mount
-  const initialSyncRef = React.useRef(false);
+  // Sync role when URL route changes
   React.useEffect(() => {
-    if (!loading && !initialSyncRef.current) {
-      initialSyncRef.current = true;
-      const path = window.location.pathname.replace('/', '').toLowerCase();
+    if (!loading) {
+      const path = (currentPath || window.location.pathname).replace(/^\//, '').toLowerCase().split('/')[0];
       const roleMap = {
         citizen: 'CITIZEN',
         user: 'CITIZEN',
@@ -88,7 +90,7 @@ const MainLayout = () => {
         demoLogin(targetRole).catch(() => {});
       }
     }
-  }, [loading, user, demoLogin]);
+  }, [loading, currentPath, user, demoLogin]);
 
   if (loading) {
     return (
@@ -112,12 +114,25 @@ const MainLayout = () => {
 
   // Determine which dashboard to render based on URL route and user role
   const renderDashboard = () => {
-    const isRoot = currentPath === '/' || currentPath === '/home' || currentPath === '';
-    if (!user || isRoot) {
+    const clean = (currentPath || window.location.pathname).replace(/^\//, '').toLowerCase().split('/')[0];
+    const isRoot = !clean || clean === 'home' || clean === 'portal';
+
+    if (isRoot) {
       return <LandingPage onOpenEmergencyModal={() => setEmergencyModalOpen(true)} />;
     }
 
-    switch (user.role) {
+    const pathToRole = {
+      citizen: 'CITIZEN',
+      user: 'CITIZEN',
+      driver: 'AMBULANCE_DRIVER',
+      hospital: 'HOSPITAL_STAFF',
+      dispatcher: 'DISPATCHER',
+      admin: 'ADMIN',
+    };
+
+    const targetRole = pathToRole[clean] || user?.role;
+
+    switch (targetRole) {
       case 'CITIZEN':
       case 'USER':
         return <UserDashboard onOpenEmergencyModal={() => setEmergencyModalOpen(true)} />;

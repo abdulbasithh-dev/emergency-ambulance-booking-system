@@ -13,16 +13,42 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
+const DEMO_KPIS = {
+  total_emergencies: 48,
+  active_emergencies: 2,
+  average_response_time_minutes: 6.8,
+  fleet_utilization_rate: 67,
+  hospital_acceptance_rate: 96,
+};
+
+const DEMO_AMBULANCES = [
+  { id: 1, vehicle_number: 'TN-01-EM-9921', ambulance_type: 'ALS', status: 'AVAILABLE', driver_name: 'Rajesh Kumar' },
+  { id: 2, vehicle_number: 'TN-02-EM-1144', ambulance_type: 'BLS', status: 'BUSY', driver_name: 'Suresh Babu' },
+  { id: 3, vehicle_number: 'TN-03-EM-5582', ambulance_type: 'ALS', status: 'AVAILABLE', driver_name: 'Murugan V.' },
+  { id: 4, vehicle_number: 'TN-04-EM-7729', ambulance_type: 'PATIENT_TRANSPORT', status: 'AVAILABLE', driver_name: 'David Paul' },
+];
+
+const DEMO_HOSPITALS_ADMIN = [
+  { id: 1, name: 'Apollo Speciality Hospital', address: 'Greams Road, Chennai', icu_beds_available: 4, general_beds_available: 18, emergency_department_status: 'NORMAL' },
+  { id: 2, name: 'Fortis Malar Hospital', address: 'Adyar, Chennai', icu_beds_available: 2, general_beds_available: 12, emergency_department_status: 'BUSY' },
+  { id: 3, name: 'MIOT International Multispeciality Hospital', address: 'Manapakkam, Chennai', icu_beds_available: 8, general_beds_available: 35, emergency_department_status: 'NORMAL' },
+];
+
+const DEMO_AUDIT_LOGS = [
+  { id: 1, action: 'EMERGENCY_DISPATCHED', entity: 'Emergency #101', user_name: 'Priya Sharma (Dispatcher)', created_at: new Date(Date.now() - 15 * 60000).toISOString() },
+  { id: 2, action: 'CAPACITY_UPDATED', entity: 'Apollo Hospital (ICU: 4)', user_name: 'Dr. Ananya Roy', created_at: new Date(Date.now() - 40 * 60000).toISOString() },
+  { id: 3, action: 'DRIVER_ON_DUTY', entity: 'TN-01-EM-9921', user_name: 'Rajesh Kumar', created_at: new Date(Date.now() - 90 * 60000).toISOString() },
+];
+
 export const AdminDashboard = () => {
-  const [kpis, setKpis] = useState(null);
-  const [ambulances, setAmbulances] = useState([]);
-  const [hospitals, setHospitals] = useState([]);
-  const [auditLogs, setAuditLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [kpis, setKpis] = useState(DEMO_KPIS);
+  const [ambulances, setAmbulances] = useState(DEMO_AMBULANCES);
+  const [hospitals, setHospitals] = useState(DEMO_HOSPITALS_ADMIN);
+  const [auditLogs, setAuditLogs] = useState(DEMO_AUDIT_LOGS);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'fleet' | 'hospitals' | 'audit'
 
   const loadData = async () => {
-    setLoading(true);
     try {
       const [kpiRes, ambRes, hospRes, auditRes] = await Promise.all([
         analyticsAPI.getOverview().catch(() => ({ data: {} })),
@@ -30,12 +56,12 @@ export const AdminDashboard = () => {
         hospitalAPI.getAll().catch(() => ({ data: [] })),
         analyticsAPI.getAuditLogs({ limit: 50 }).catch(() => ({ data: [] })),
       ]);
-      setKpis(kpiRes.data);
-      setAmbulances(ambRes.data);
-      setHospitals(hospRes.data);
-      setAuditLogs(auditRes.data);
+      setKpis(Object.keys(kpiRes.data || {}).length > 0 ? kpiRes.data : DEMO_KPIS);
+      setAmbulances(ambRes.data?.length > 0 ? ambRes.data : DEMO_AMBULANCES);
+      setHospitals(hospRes.data?.length > 0 ? hospRes.data : DEMO_HOSPITALS_ADMIN);
+      setAuditLogs(auditRes.data?.length > 0 ? auditRes.data : DEMO_AUDIT_LOGS);
     } catch (err) {
-      console.error('Failed to load admin data:', err);
+      console.warn('Failed to load live admin data, using demo telemetry');
     } finally {
       setLoading(false);
     }
