@@ -6,8 +6,8 @@ from app.schemas.ambulance import AmbulanceResponse
 from app.schemas.hospital import HospitalResponse
 
 class EmergencyCreate(BaseModel):
-    patient_name: str
-    patient_age: Optional[int] = None
+    patient_name: Optional[str] = "Emergency Patient"
+    patient_age: Optional[int] = 45
     emergency_type: EmergencyType = EmergencyType.ACCIDENT
     priority: Optional[EmergencyPriority] = EmergencyPriority.CRITICAL
     description: Optional[str] = None
@@ -15,9 +15,9 @@ class EmergencyCreate(BaseModel):
     contact_number: Optional[str] = "+91 98401 23456"
     contact_phone: Optional[str] = None
     preferred_hospital: Optional[str] = None
-    pickup_address: str
-    pickup_lat: float = 13.0827
-    pickup_lng: float = 80.2707
+    pickup_address: Optional[str] = "41, Potheri, SRM University Campus, Chennai"
+    pickup_lat: float = 12.8235
+    pickup_lng: float = 80.0445
     pickup_latitude: Optional[float] = None
     pickup_longitude: Optional[float] = None
     severity_level: Optional[str] = None
@@ -29,6 +29,14 @@ class EmergencyCreate(BaseModel):
     @classmethod
     def normalize_emergency_fields(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            # Patient Name default
+            if not data.get("patient_name"):
+                data["patient_name"] = "Emergency Patient"
+
+            # Pickup Address default
+            if not data.get("pickup_address"):
+                data["pickup_address"] = "41, Potheri, SRM University Campus, Chennai"
+
             # Hospital ID
             if "selected_hospital_id" not in data or data.get("selected_hospital_id") is None:
                 if "hospital_id" in data:
@@ -70,26 +78,27 @@ class EmergencyCreate(BaseModel):
             if not data.get("description") and data.get("notes"):
                 data["description"] = data["notes"]
 
-            # Emergency Type mapping
-            etype = str(data.get("emergency_type", ""))
-            type_map = {
-                "CARDIAC_ARREST": EmergencyType.CARDIAC,
-                "Cardiac emergency": EmergencyType.CARDIAC,
-                "TRAUMA_ACCIDENT": EmergencyType.ACCIDENT,
-                "Accident": EmergencyType.ACCIDENT,
-                "RESPIRATORY_DISTRESS": EmergencyType.BREATHING,
-                "Breathing problem": EmergencyType.BREATHING,
-                "STROKE": EmergencyType.UNCONSCIOUS,
-                "Unconscious patient": EmergencyType.UNCONSCIOUS,
-                "PREGNANCY_COMPLICATIONS": EmergencyType.PREGNANCY,
-                "Pregnancy": EmergencyType.PREGNANCY,
-                "BURNS": EmergencyType.FIRE,
-                "Fire emergency": EmergencyType.FIRE,
-                "GENERAL_MEDICAL": EmergencyType.OTHER,
-                "Other": EmergencyType.OTHER,
-            }
-            if etype in type_map:
-                data["emergency_type"] = type_map[etype]
+            # Emergency Type mapping & flexible normalization
+            raw_etype = str(data.get("emergency_type", ""))
+            etype_lower = raw_etype.lower()
+            if "cardiac" in etype_lower or "heart" in etype_lower or "chest" in etype_lower:
+                data["emergency_type"] = EmergencyType.CARDIAC
+            elif "accident" in etype_lower or "trauma" in etype_lower or "road" in etype_lower:
+                data["emergency_type"] = EmergencyType.ACCIDENT
+            elif "breath" in etype_lower or "respirat" in etype_lower or "asthma" in etype_lower:
+                data["emergency_type"] = EmergencyType.BREATHING
+            elif "stroke" in etype_lower or "paralysis" in etype_lower or "unconscious" in etype_lower:
+                data["emergency_type"] = EmergencyType.UNCONSCIOUS
+            elif "pregnan" in etype_lower:
+                data["emergency_type"] = EmergencyType.PREGNANCY
+            elif "burn" in etype_lower or "fire" in etype_lower:
+                data["emergency_type"] = EmergencyType.FIRE
+            elif "injury" in etype_lower:
+                data["emergency_type"] = EmergencyType.INJURY
+            elif raw_etype in [e.value for e in EmergencyType]:
+                data["emergency_type"] = EmergencyType(raw_etype)
+            else:
+                data["emergency_type"] = EmergencyType.OTHER
         return data
 
 class StatusHistoryItem(BaseModel):
