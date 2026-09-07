@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { emergencyAPI, hospitalAPI } from '../api';
 import { useWebSocket } from '../context/WebSocketContext';
+import { STATIC_HOSPITALS } from '../constants/hospitals';
 import {
   X,
   HeartPulse,
@@ -34,8 +35,8 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
   const [step, setStep] = useState(1); // 1: Emergency & Patient, 2: Hospital Selection
   const [loading, setLoading] = useState(false);
   const [loadingHospitals, setLoadingHospitals] = useState(false);
-  const [hospitals, setHospitals] = useState([]);
-  const [selectedHospital, setSelectedHospital] = useState(null);
+  const [hospitals, setHospitals] = useState(STATIC_HOSPITALS);
+  const [selectedHospital, setSelectedHospital] = useState(STATIC_HOSPITALS[0]);
 
   const [formData, setFormData] = useState({
     emergency_type: 'CARDIAC_ARREST',
@@ -89,22 +90,29 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
         formData.severity_level
       );
       
-      let list = recRes.data || [];
+      let list = Array.isArray(recRes.data) && recRes.data.length > 0 ? recRes.data : [];
       if (!list.length) {
         const allRes = await hospitalAPI.getAll();
-        list = (allRes.data || []).map((h) => ({
-          hospital_id: h.id,
-          name: h.name,
-          address: h.address,
-          phone: h.phone,
-          distance_km: 4.5,
-          eta_minutes: 10,
-          icu_beds_available: h.icu_beds_available,
-          ventilators_available: h.ventilators_available,
-          emergency_dept_status: h.emergency_dept_status,
-          trauma_capable: h.trauma_capable,
-          cardiac_capable: h.cardiac_capable,
-        }));
+        if (Array.isArray(allRes.data) && allRes.data.length > 0) {
+          list = allRes.data.map((h) => ({
+            hospital_id: h.id,
+            id: h.id,
+            name: h.name,
+            address: h.address,
+            phone: h.phone || h.phone_number,
+            distance_km: 4.5,
+            eta_minutes: 10,
+            icu_beds_available: h.icu_beds_available,
+            ventilators_available: h.ventilators_available,
+            emergency_dept_status: h.emergency_dept_status || h.emergency_department_status || 'NORMAL',
+            trauma_capable: h.trauma_capable ?? true,
+            cardiac_capable: h.cardiac_capable ?? true,
+          }));
+        }
+      }
+
+      if (!list.length) {
+        list = STATIC_HOSPITALS;
       }
 
       setHospitals(list);
@@ -112,71 +120,33 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
         setSelectedHospital(list[0]);
       }
     } catch (err) {
-      console.warn('Failed to load hospital recommendations', err);
-      // Fallback
+      console.warn('Live hospital recommendations unavailable, using verified trauma centers:', err);
       try {
         const fallbackRes = await hospitalAPI.getAll();
-        const fallbackList = (fallbackRes.data || []).map((h) => ({
+        const fallbackList = Array.isArray(fallbackRes.data) && fallbackRes.data.length > 0 ? fallbackRes.data.map((h) => ({
           hospital_id: h.id,
+          id: h.id,
           name: h.name,
           address: h.address,
-          phone: h.phone,
+          phone: h.phone || h.phone_number,
           distance_km: 5.0,
           eta_minutes: 12,
           icu_beds_available: h.icu_beds_available,
           ventilators_available: h.ventilators_available,
-          emergency_dept_status: h.emergency_dept_status,
-          trauma_capable: h.trauma_capable,
-          cardiac_capable: h.cardiac_capable,
-        }));
-        setHospitals(fallbackList);
+          emergency_dept_status: h.emergency_dept_status || h.emergency_department_status || 'NORMAL',
+          trauma_capable: h.trauma_capable ?? true,
+          cardiac_capable: h.cardiac_capable ?? true,
+        })) : [];
         if (fallbackList.length > 0) {
+          setHospitals(fallbackList);
           setSelectedHospital(fallbackList[0]);
+        } else {
+          setHospitals(STATIC_HOSPITALS);
+          setSelectedHospital(STATIC_HOSPITALS[0]);
         }
       } catch (e2) {
-        const staticList = [
-          {
-            hospital_id: 1,
-            name: 'Apollo Speciality Hospital (Emergency & Trauma)',
-            address: 'Greams Road, Chennai',
-            phone: '+91 44 2829 0200',
-            distance_km: 3.2,
-            eta_minutes: 8,
-            icu_beds_available: 4,
-            ventilators_available: 3,
-            emergency_dept_status: 'NORMAL',
-            trauma_capable: true,
-            cardiac_capable: true,
-          },
-          {
-            hospital_id: 2,
-            name: 'Fortis Malar Hospital (Cardiac & Critical Care)',
-            address: 'Gandhi Nagar, Adyar, Chennai',
-            phone: '+91 44 4289 2222',
-            distance_km: 5.1,
-            eta_minutes: 12,
-            icu_beds_available: 2,
-            ventilators_available: 1,
-            emergency_dept_status: 'BUSY',
-            trauma_capable: true,
-            cardiac_capable: true,
-          },
-          {
-            hospital_id: 3,
-            name: 'MIOT International Multispeciality Hospital',
-            address: 'Manapakkam, Chennai',
-            phone: '+91 44 4200 2288',
-            distance_km: 7.8,
-            eta_minutes: 16,
-            icu_beds_available: 8,
-            ventilators_available: 6,
-            emergency_dept_status: 'NORMAL',
-            trauma_capable: true,
-            cardiac_capable: true,
-          }
-        ];
-        setHospitals(staticList);
-        setSelectedHospital(staticList[0]);
+        setHospitals(STATIC_HOSPITALS);
+        setSelectedHospital(STATIC_HOSPITALS[0]);
       }
     } finally {
       setLoadingHospitals(false);
@@ -206,8 +176,9 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
       GENERAL_MEDICAL: 'Other',
     };
 
-    const targetHospId = selectedHospital?.hospital_id || selectedHospital?.id || 1;
-    const targetHospName = selectedHospital?.name || 'Apollo Speciality Hospital (Emergency & Trauma)';
+    const targetHosp = selectedHospital || STATIC_HOSPITALS[0];
+    const targetHospId = targetHosp?.hospital_id || targetHosp?.id || 1;
+    const targetHospName = targetHosp?.name || 'Apollo Speciality Hospital (Emergency & Trauma)';
 
     const payload = {
       patient_name: formData.patient_name || 'Emergency Patient',
@@ -226,14 +197,16 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
 
     try {
       const res = await emergencyAPI.create(payload);
-      localStorage.setItem('resq_active_emergency', JSON.stringify(res.data));
+      const emergencyData = res.data;
+      localStorage.setItem('resq_active_emergency', JSON.stringify(emergencyData));
+      window.dispatchEvent(new CustomEvent('resq-emergency-updated', { detail: emergencyData }));
       addToast(
         '🚨 SOS Ambulance Dispatched!',
         `Assigned response unit en route to ${formData.pickup_address.split(',')[0]} • ER Destination: ${targetHospName}`,
         'crimson'
       );
       if (onEmergencyCreated) {
-        onEmergencyCreated(res.data);
+        onEmergencyCreated(emergencyData);
       }
       onClose();
     } catch (err) {
@@ -257,7 +230,7 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
           current_longitude: (formData.pickup_longitude ?? 80.2341) - 0.015,
           speed_kmh: 48.0,
         },
-        selected_hospital: selectedHospital || {
+        selected_hospital: targetHosp || {
           name: targetHospName,
           address: 'Greams Road, Chennai',
           latitude: 13.0569,
@@ -265,6 +238,7 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
         }
       };
       localStorage.setItem('resq_active_emergency', JSON.stringify(mockEmergency));
+      window.dispatchEvent(new CustomEvent('resq-emergency-updated', { detail: mockEmergency }));
       addToast(
         '🚨 SOS Ambulance Dispatched!',
         `Response unit TN-01-EM-9921 en route • ER Destination: ${targetHospName}`,

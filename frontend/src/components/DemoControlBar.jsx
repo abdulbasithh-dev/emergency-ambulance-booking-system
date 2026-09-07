@@ -55,6 +55,93 @@ export const DemoControlBar = () => {
     return unsubscribe;
   }, [subscribe]);
 
+  const clientSimRef = React.useRef(null);
+
+  // Client-side simulation runner for static/demo hosting
+  useEffect(() => {
+    if (!isSimulating) {
+      if (clientSimRef.current) {
+        clearInterval(clientSimRef.current);
+        clientSimRef.current = null;
+      }
+      return;
+    }
+
+    // Status progression steps
+    const stages = [
+      { status: 'EN_ROUTE_TO_PICKUP', eta: 4, dist: 2.1, msg: 'Ambulance dispatched and en route to patient pickup' },
+      { status: 'ARRIVED_AT_SCENE', eta: 0, dist: 0, msg: 'Paramedics on scene providing immediate stabilization' },
+      { status: 'IN_TRANSIT_TO_HOSPITAL', eta: 6, dist: 3.5, msg: 'Patient loaded, rushing with sirens to Apollo Emergency Room' },
+      { status: 'ARRIVED_AT_HOSPITAL', eta: 0, dist: 0, msg: 'Arrived at Apollo ER Trauma Bay • Patient handed over to doctors' },
+    ];
+
+    let currentStep = 0;
+    clientSimRef.current = setInterval(() => {
+      currentStep = (currentStep + 1);
+      if (currentStep >= stages.length) {
+        setIsSimulating(false);
+        addToast('Simulation Completed', 'Full emergency mission sequence concluded successfully!', 'emerald');
+        return;
+      }
+
+      const stage = stages[currentStep];
+      let storedEmergency = null;
+      try {
+        const saved = localStorage.getItem('resq_active_emergency');
+        if (saved) storedEmergency = JSON.parse(saved);
+      } catch {}
+
+      const updatedEmergency = {
+        ...(storedEmergency || {
+          id: 101,
+          emergency_type: 'CARDIAC_ARREST',
+          priority: 'CRITICAL',
+          pickup_address: 'T. Nagar, Usman Road, Chennai',
+          pickup_lat: 13.0418,
+          pickup_lng: 80.2341,
+          selected_hospital: {
+            name: 'Apollo Speciality Hospital (Emergency & Trauma)',
+            address: 'Greams Road, Chennai',
+            latitude: 13.0569,
+            longitude: 80.2525,
+            icu_beds_available: 4,
+          },
+        }),
+        status: stage.status,
+        eta_minutes: stage.eta,
+        estimated_eta_minutes: stage.eta,
+        distance_km: stage.dist,
+        estimated_distance_km: stage.dist,
+        ambulance: {
+          id: 1,
+          vehicle_number: 'TN-01-EM-9921',
+          driver_name: 'Rajesh Kumar (ALS Paramedic)',
+          driver_phone: '+91 98765 43210',
+          ambulance_type: 'ALS (Advanced Life Support)',
+          speed_kmh: stage.eta === 0 ? 0 : 54,
+          current_lat: stage.status === 'ARRIVED_AT_HOSPITAL' ? 13.0569 : 13.0418 + (stage.eta * 0.003),
+          current_lng: stage.status === 'ARRIVED_AT_HOSPITAL' ? 80.2525 : 80.2341 - (stage.eta * 0.003),
+          current_latitude: stage.status === 'ARRIVED_AT_HOSPITAL' ? 13.0569 : 13.0418 + (stage.eta * 0.003),
+          current_longitude: stage.status === 'ARRIVED_AT_HOSPITAL' ? 80.2525 : 80.2341 - (stage.eta * 0.003),
+        }
+      };
+
+      try {
+        localStorage.setItem('resq_active_emergency', JSON.stringify(updatedEmergency));
+      } catch {}
+
+      window.dispatchEvent(new CustomEvent('resq-emergency-updated', { detail: updatedEmergency }));
+      addToast('📡 Mission Telemetry', stage.msg, 'cyan');
+    }, 4000);
+
+    return () => {
+      if (clientSimRef.current) {
+        clearInterval(clientSimRef.current);
+        clientSimRef.current = null;
+      }
+    };
+  }, [isSimulating, addToast]);
+
   const handleRoleSwitch = async (role) => {
     setSwitchingRole(true);
     const routeMap = {
@@ -64,6 +151,14 @@ export const DemoControlBar = () => {
       HOSPITAL_STAFF: '/hospital',
       DISPATCHER: '/dispatcher',
       ADMIN: '/admin',
+    };
+    const roleLabels = {
+      PORTAL: 'Front Portal',
+      CITIZEN: 'Citizen (Patient View)',
+      AMBULANCE_DRIVER: 'Ambulance Driver Cockpit',
+      HOSPITAL_STAFF: 'Hospital Emergency Room',
+      DISPATCHER: 'Central Dispatch Command',
+      ADMIN: 'Admin Control Center',
     };
     const targetPath = routeMap[role] || '/';
     window.history.pushState(null, '', targetPath);
@@ -78,16 +173,10 @@ export const DemoControlBar = () => {
         return;
       }
       await demoLogin(role);
-      const roleLabels = {
-        CITIZEN: 'Citizen (Patient View)',
-        AMBULANCE_DRIVER: 'Ambulance Driver Cockpit',
-        HOSPITAL_STAFF: 'Hospital Emergency Room',
-        DISPATCHER: 'Central Dispatch Command',
-        ADMIN: 'Admin Control Center',
-      };
       addToast('Role Switched', `Swapped context to ${roleLabels[role] || role}`, 'emerald');
     } catch (err) {
-      console.warn('Role switch caught note:', err);
+      console.warn('Role switch note:', err);
+      addToast('Role Switched', `Swapped context to ${roleLabels[role] || role}`, 'emerald');
     } finally {
       setSwitchingRole(false);
     }
@@ -112,7 +201,8 @@ export const DemoControlBar = () => {
       }
     } catch (err) {
       console.error(err);
-      addToast('Simulation Error', 'Failed to toggle simulation', 'amber');
+      setIsSimulating(true);
+      addToast('Simulation Launched', 'Demo telemetry playback active', 'emerald');
     }
   };
 

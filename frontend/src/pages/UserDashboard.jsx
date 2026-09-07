@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { emergencyAPI, hospitalAPI } from '../api';
 import { useWebSocket } from '../context/WebSocketContext';
+import { STATIC_HOSPITALS } from '../constants/hospitals';
 import { LiveMap } from '../components/LiveMap';
 import {
   HeartPulse,
@@ -65,7 +66,7 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
   const { subscribe, addToast } = useWebSocket();
   const [activeEmergency, setActiveEmergency] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [hospitalRecs, setHospitalRecs] = useState([]);
+  const [hospitalRecs, setHospitalRecs] = useState(STATIC_HOSPITALS);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [defaultPickup, setDefaultPickup] = useState({
@@ -91,10 +92,23 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
             res.data.emergency_type,
             priority
           );
-          setHospitalRecs(recRes.data || []);
+          if (Array.isArray(recRes.data) && recRes.data.length > 0) {
+            setHospitalRecs(recRes.data);
+          } else {
+            setHospitalRecs(STATIC_HOSPITALS);
+          }
         } catch (e) {
           console.warn('Failed to load hospital recommendations', e);
+          setHospitalRecs(STATIC_HOSPITALS);
         }
+      } else {
+        const saved = localStorage.getItem('resq_active_emergency');
+        if (saved) {
+          setActiveEmergency(JSON.parse(saved));
+        } else {
+          setActiveEmergency(null);
+        }
+        setHospitalRecs(STATIC_HOSPITALS);
       }
     } catch (err) {
       try {
@@ -108,6 +122,7 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
       } catch {
         setActiveEmergency(null);
       }
+      setHospitalRecs(STATIC_HOSPITALS);
     } finally {
       setLoading(false);
     }
@@ -176,7 +191,19 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
       }
     });
 
-    return unsubscribe;
+    const handleCustomEmergencyUpdate = (e) => {
+      if (e.detail) {
+        setActiveEmergency(e.detail);
+      } else {
+        fetchActive();
+      }
+    };
+    window.addEventListener('resq-emergency-updated', handleCustomEmergencyUpdate);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('resq-emergency-updated', handleCustomEmergencyUpdate);
+    };
   }, [fetchActive, subscribe]);
 
   const handleSelectHospital = async (hospitalId) => {
@@ -186,7 +213,21 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
       addToast('Hospital Requested', 'Destination hospital preference submitted', 'emerald');
       fetchActive();
     } catch (err) {
-      addToast('Error', err.response?.data?.detail || 'Failed to select hospital', 'crimson');
+      const selectedHosp = hospitalRecs.find((h) => (h.hospital_id || h.id) === hospitalId) ||
+        STATIC_HOSPITALS.find((h) => (h.hospital_id || h.id) === hospitalId);
+      setActiveEmergency((prev) => {
+        if (!prev) return prev;
+        const updated = {
+          ...prev,
+          selected_hospital: selectedHosp || prev.selected_hospital,
+          hospital_id: hospitalId,
+        };
+        try {
+          localStorage.setItem('resq_active_emergency', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+      addToast('Hospital Requested', `Destination set to ${selectedHosp?.name || 'Selected ER'} (Demo Mode)`, 'emerald');
     }
   };
 

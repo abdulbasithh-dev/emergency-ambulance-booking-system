@@ -66,18 +66,19 @@ const DEMO_FALLBACK_USERS = {
 };
 
   const demoLogin = async (role) => {
-    setLoading(true);
-    if (role === 'PORTAL') {
+    if (!role || role === 'PORTAL') {
       setUser(null);
       localStorage.removeItem('resq_user');
       localStorage.removeItem('resq_token');
       setToken(null);
-      setLoading(false);
       return null;
     }
     try {
       const res = await authAPI.demoLogin(role);
-      const accessToken = res.data.access_token;
+      if (!res.data?.user) {
+        throw new Error('No user data returned from demo-login');
+      }
+      const accessToken = res.data.access_token || 'demo_fallback_token';
       localStorage.setItem('resq_token', accessToken);
       localStorage.setItem('resq_user', JSON.stringify(res.data.user));
       setToken(accessToken);
@@ -85,11 +86,12 @@ const DEMO_FALLBACK_USERS = {
       return res.data.user;
     } catch (err) {
       console.warn('Backend demo-login unavailable, using client demo persona:', err.message);
-      const fallbackUser = DEMO_FALLBACK_USERS[role] || {
+      const roleUpper = String(role).toUpperCase();
+      const fallbackUser = DEMO_FALLBACK_USERS[roleUpper] || DEMO_FALLBACK_USERS[role] || {
         id: 1,
-        full_name: `${role.replace('_', ' ')} (Demo)`,
+        full_name: `${role.replace(/_/g, ' ')} (Demo)`,
         email: `${role.toLowerCase()}@resq.demo`,
-        role: role,
+        role: roleUpper,
       };
       if (fallbackUser) {
         setUser(fallbackUser);
@@ -101,8 +103,6 @@ const DEMO_FALLBACK_USERS = {
         localStorage.removeItem('resq_user');
       }
       return fallbackUser;
-    } finally {
-      setLoading(false);
     }
   };
 

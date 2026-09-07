@@ -2,7 +2,8 @@ import axios from 'axios';
 
 // Default API client
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
+  timeout: 6000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -11,15 +12,27 @@ const api = axios.create({
 // Interceptor to inject JWT token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('resq_token');
-  if (token) {
+  if (token && token !== 'demo_fallback_token') {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Interceptor to handle 401s gracefully
+// Interceptor to handle HTML fallbacks & 401s gracefully
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Detect Netlify / SPA fallback serving index.html instead of JSON API response
+    const contentType = response.headers?.['content-type'] || '';
+    if (
+      contentType.includes('text/html') ||
+      (typeof response.data === 'string' && response.data.trim().startsWith('<'))
+    ) {
+      const error = new Error('Backend API service offline (HTML fallback received)');
+      error.response = { status: 404, data: { detail: 'Backend API offline' } };
+      return Promise.reject(error);
+    }
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401) {
       // Optional: Clear token if invalid, but keep demo switcher intact
