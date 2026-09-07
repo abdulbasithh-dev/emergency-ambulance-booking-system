@@ -67,12 +67,71 @@ export const DemoControlBar = () => {
       return;
     }
 
-    // Status progression steps
+    // Status progression steps matching exact ResQ 9-Step workflow
     const stages = [
-      { status: 'EN_ROUTE_TO_PICKUP', eta: 4, dist: 2.1, msg: 'Ambulance dispatched and en route to patient pickup' },
-      { status: 'ARRIVED_AT_SCENE', eta: 0, dist: 0, msg: 'Paramedics on scene providing immediate stabilization' },
-      { status: 'IN_TRANSIT_TO_HOSPITAL', eta: 6, dist: 3.5, msg: 'Patient loaded, rushing with sirens to Apollo Emergency Room' },
-      { status: 'ARRIVED_AT_HOSPITAL', eta: 0, dist: 0, msg: 'Arrived at Apollo ER Trauma Bay • Patient handed over to doctors' },
+      {
+        status: 'EN_ROUTE_TO_PICKUP',
+        patient_status: 'WAITING_FOR_PICKUP',
+        hospital_decision: 'PENDING',
+        eta: 5,
+        dist: 2.8,
+        toastTitle: 'Ambulance Accepted',
+        toastMsg: 'Your ambulance is on the way.',
+        toastType: 'emerald'
+      },
+      {
+        status: 'ARRIVED_AT_SCENE',
+        patient_status: 'WAITING_FOR_PICKUP',
+        hospital_decision: 'PENDING',
+        eta: 0,
+        dist: 0,
+        toastTitle: 'Ambulance Arrived',
+        toastMsg: 'Paramedics on scene with patient.',
+        toastType: 'cyan'
+      },
+      {
+        status: 'IN_TRANSIT_TO_HOSPITAL',
+        patient_status: 'PICKED_UP',
+        hospital_decision: 'PENDING',
+        eta: 6,
+        dist: 3.5,
+        toastTitle: 'Patient Picked Up',
+        toastMsg: 'Driver confirmed pickup • Proceeding to citizen-selected hospital.',
+        toastType: 'emerald'
+      },
+      {
+        status: 'IN_TRANSIT_TO_HOSPITAL',
+        patient_status: 'PICKED_UP',
+        hospital_decision: 'ACCEPTED',
+        hospital_confirmed: true,
+        eta: 3,
+        dist: 1.8,
+        toastTitle: 'Hospital Confirmed',
+        toastMsg: 'The hospital has accepted the incoming emergency.',
+        toastType: 'emerald'
+      },
+      {
+        status: 'ARRIVED_AT_HOSPITAL',
+        patient_status: 'PICKED_UP',
+        hospital_decision: 'ACCEPTED',
+        hospital_confirmed: true,
+        eta: 0,
+        dist: 0,
+        toastTitle: 'Arrived at Hospital ER',
+        toastMsg: 'Trauma bay prepared • Transferring patient.',
+        toastType: 'cyan'
+      },
+      {
+        status: 'HANDOVER_COMPLETE',
+        patient_status: 'PICKED_UP',
+        hospital_decision: 'ACCEPTED',
+        hospital_confirmed: true,
+        eta: 0,
+        dist: 0,
+        toastTitle: 'Trip Completed',
+        toastMsg: 'Patient handover completed successfully.',
+        toastType: 'emerald'
+      },
     ];
 
     let currentStep = 0;
@@ -80,7 +139,7 @@ export const DemoControlBar = () => {
       currentStep = (currentStep + 1);
       if (currentStep >= stages.length) {
         setIsSimulating(false);
-        addToast('Simulation Completed', 'Full emergency mission sequence concluded successfully!', 'emerald');
+        addToast('Trip Completed', 'Full emergency mission sequence concluded successfully!', 'emerald');
         return;
       }
 
@@ -91,6 +150,14 @@ export const DemoControlBar = () => {
         if (saved) storedEmergency = JSON.parse(saved);
       } catch {}
 
+      const destHosp = storedEmergency?.selected_hospital || storedEmergency?.destination_hospital || {
+        name: 'Apollo Speciality Hospital (Emergency & Trauma)',
+        address: 'Greams Road, Chennai',
+        latitude: 13.0569,
+        longitude: 80.2525,
+        icu_beds_available: 4,
+      };
+
       const updatedEmergency = {
         ...(storedEmergency || {
           id: 101,
@@ -99,15 +166,13 @@ export const DemoControlBar = () => {
           pickup_address: 'T. Nagar, Usman Road, Chennai',
           pickup_lat: 13.0418,
           pickup_lng: 80.2341,
-          selected_hospital: {
-            name: 'Apollo Speciality Hospital (Emergency & Trauma)',
-            address: 'Greams Road, Chennai',
-            latitude: 13.0569,
-            longitude: 80.2525,
-            icu_beds_available: 4,
-          },
         }),
+        selected_hospital: destHosp,
+        destination_hospital: destHosp,
         status: stage.status,
+        patient_status: stage.patient_status,
+        hospital_decision: stage.hospital_decision,
+        hospital_confirmed: stage.hospital_confirmed || false,
         eta_minutes: stage.eta,
         estimated_eta_minutes: stage.eta,
         distance_km: stage.dist,
@@ -119,10 +184,10 @@ export const DemoControlBar = () => {
           driver_phone: '+91 98765 43210',
           ambulance_type: 'ALS (Advanced Life Support)',
           speed_kmh: stage.eta === 0 ? 0 : 54,
-          current_lat: stage.status === 'ARRIVED_AT_HOSPITAL' ? 13.0569 : 13.0418 + (stage.eta * 0.003),
-          current_lng: stage.status === 'ARRIVED_AT_HOSPITAL' ? 80.2525 : 80.2341 - (stage.eta * 0.003),
-          current_latitude: stage.status === 'ARRIVED_AT_HOSPITAL' ? 13.0569 : 13.0418 + (stage.eta * 0.003),
-          current_longitude: stage.status === 'ARRIVED_AT_HOSPITAL' ? 80.2525 : 80.2341 - (stage.eta * 0.003),
+          current_lat: stage.status === 'ARRIVED_AT_HOSPITAL' || stage.status === 'HANDOVER_COMPLETE' ? (destHosp.latitude || 13.0569) : 13.0418 + (stage.eta * 0.003),
+          current_lng: stage.status === 'ARRIVED_AT_HOSPITAL' || stage.status === 'HANDOVER_COMPLETE' ? (destHosp.longitude || 80.2525) : 80.2341 - (stage.eta * 0.003),
+          current_latitude: stage.status === 'ARRIVED_AT_HOSPITAL' || stage.status === 'HANDOVER_COMPLETE' ? (destHosp.latitude || 13.0569) : 13.0418 + (stage.eta * 0.003),
+          current_longitude: stage.status === 'ARRIVED_AT_HOSPITAL' || stage.status === 'HANDOVER_COMPLETE' ? (destHosp.longitude || 80.2525) : 80.2341 - (stage.eta * 0.003),
         }
       };
 
@@ -131,8 +196,15 @@ export const DemoControlBar = () => {
       } catch {}
 
       window.dispatchEvent(new CustomEvent('resq-emergency-updated', { detail: updatedEmergency }));
-      addToast('📡 Mission Telemetry', stage.msg, 'cyan');
-    }, 4000);
+      window.dispatchEvent(new CustomEvent('resq-toast-broadcast', {
+        detail: {
+          title: stage.toastTitle,
+          message: stage.toastMsg,
+          type: stage.toastType
+        }
+      }));
+      addToast(stage.toastTitle, stage.toastMsg, stage.toastType);
+    }, 4500);
 
     return () => {
       if (clientSimRef.current) {

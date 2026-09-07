@@ -16,6 +16,7 @@ import {
   Clock,
   Phone,
   Radio,
+  UserCheck,
 } from 'lucide-react';
 
 const DEFAULT_DEMO_AMBULANCE = {
@@ -74,6 +75,7 @@ export const DriverDashboard = () => {
   const [activeEmergency, setActiveEmergency] = useState(DEFAULT_DEMO_EMERGENCY);
   const [hospitals, setHospitals] = useState(FALLBACK_HOSPITALS);
   const [loading, setLoading] = useState(false);
+  const [pickupModalOpen, setPickupModalOpen] = useState(false);
 
   // Hospital Change Request state
   const [diversionModalOpen, setDiversionModalOpen] = useState(false);
@@ -95,8 +97,18 @@ export const DriverDashboard = () => {
         const emRes = await emergencyAPI.getActive();
         if (emRes.data) {
           setActiveEmergency(emRes.data);
+        } else {
+          const saved = localStorage.getItem('resq_active_emergency');
+          if (saved) {
+            try { setActiveEmergency(JSON.parse(saved)); } catch {}
+          }
         }
-      } catch (e) {}
+      } catch (e) {
+        const saved = localStorage.getItem('resq_active_emergency');
+        if (saved) {
+          try { setActiveEmergency(JSON.parse(saved)); } catch {}
+        }
+      }
 
       // Fetch hospitals
       const hospRes = await hospitalAPI.getAll();
@@ -107,7 +119,16 @@ export const DriverDashboard = () => {
     } catch (err) {
       console.warn('Driver data API unavailable, active in demo mode');
       setAmbulance((prev) => prev || DEFAULT_DEMO_AMBULANCE);
-      setActiveEmergency((prev) => prev || DEFAULT_DEMO_EMERGENCY);
+      try {
+        const saved = localStorage.getItem('resq_active_emergency');
+        if (saved) {
+          setActiveEmergency(JSON.parse(saved));
+        } else {
+          setActiveEmergency((prev) => prev || DEFAULT_DEMO_EMERGENCY);
+        }
+      } catch {
+        setActiveEmergency((prev) => prev || DEFAULT_DEMO_EMERGENCY);
+      }
       setHospitals(FALLBACK_HOSPITALS);
     } finally {
       setLoading(false);
@@ -121,6 +142,15 @@ export const DriverDashboard = () => {
     const pollInterval = setInterval(() => {
       fetchDriverData();
     }, 3500);
+
+    const handleCustomEmergencyUpdate = (e) => {
+      if (e.detail) {
+        setActiveEmergency(e.detail);
+      } else {
+        fetchDriverData();
+      }
+    };
+    window.addEventListener('resq-emergency-updated', handleCustomEmergencyUpdate);
 
     const unsubscribe = subscribe((msg) => {
       if (msg.event === 'DISPATCH_REQUEST' || msg.event === 'NEW_DISPATCH_OFFER') {
@@ -157,6 +187,7 @@ export const DriverDashboard = () => {
 
     return () => {
       clearInterval(pollInterval);
+      window.removeEventListener('resq-emergency-updated', handleCustomEmergencyUpdate);
       unsubscribe();
     };
   }, [fetchDriverData, subscribe, addToast]);
@@ -192,8 +223,62 @@ export const DriverDashboard = () => {
     }
   };
 
+  const handleAcceptEmergency = async () => {
+    if (!activeEmergency) return;
+    try {
+      if (ambulance) {
+        await ambulanceAPI.updateStatus(ambulance.id, 'DISPATCHED').catch(() => {});
+      }
+    } catch {}
+    await handleAdvanceStatus('EN_ROUTE_TO_PICKUP');
+    addToast('Ambulance Accepted', 'Your ambulance is on the way.', 'emerald');
+    window.dispatchEvent(new CustomEvent('resq-toast-broadcast', {
+      detail: {
+        title: 'Ambulance Accepted',
+        message: 'Your ambulance is on the way.',
+        type: 'emerald'
+      }
+    }));
+  };
+
+  const handleConfirmPickup = async () => {
+    setPickupModalOpen(false);
+    await handleAdvanceStatus('IN_TRANSIT_TO_HOSPITAL');
+    const destHosp = (activeEmergency?.selected_hospital || activeEmergency?.destination_hospital)?.name || 'Citizen-Selected Hospital';
+    addToast(
+      'Patient Picked Up',
+      `Proceeding to ${destHosp}`,
+      'emerald'
+    );
+    window.dispatchEvent(new CustomEvent('resq-toast-broadcast', {
+      detail: {
+        title: 'Patient Picked Up',
+        message: `Ambulance is transporting patient to ${destHosp}`,
+        type: 'cyan'
+      }
+    }));
+  };
+
   const handleAdvanceStatus = async (nextStatus) => {
     if (!activeEmergency) return;
+    const destHosp = activeEmergency.selected_hospital || activeEmergency.destination_hospital;
+    const updated = {
+      ...activeEmergency,
+      status: nextStatus,
+      patient_status: nextStatus === 'IN_TRANSIT_TO_HOSPITAL' || nextStatus === 'PATIENT_ONBOARD' ? 'PICKED_UP' : activeEmergency.patient_status,
+      selected_hospital: destHosp || activeEmergency.selected_hospital,
+    };
+
+    if (nextStatus === 'EN_ROUTE_TO_PICKUP' || nextStatus === 'AMBULANCE_EN_ROUTE') {
+      window.dispatchEvent(new CustomEvent('resq-toast-broadcast', {
+        detail: {
+          title: 'Ambulance Accepted',
+          message: 'Your ambulance is on the way.',
+          type: 'emerald'
+        }
+      }));
+    }
+
     try {
       await emergencyAPI.updateStatus(activeEmergency.id, nextStatus, `Status advanced by driver ${user?.full_name}`);
 
@@ -240,19 +325,27 @@ export const DriverDashboard = () => {
       }
 
       if (nextStatus === 'CASE_COMPLETED' || nextStatus === 'HANDOVER_COMPLETE') {
+        localStorage.removeItem('resq_active_emergency');
         setActiveEmergency(null);
+        window.dispatchEvent(new CustomEvent('resq-emergency-updated', { detail: null }));
         addToast('Mission Completed', 'Patient handover completed successfully. Vehicle returned to available fleet.', 'emerald');
         fetchDriverData();
       } else {
-        setActiveEmergency((prev) => (prev ? { ...prev, status: nextStatus } : null));
+        localStorage.setItem('resq_active_emergency', JSON.stringify(updated));
+        setActiveEmergency(updated);
+        window.dispatchEvent(new CustomEvent('resq-emergency-updated', { detail: updated }));
         addToast('Mission Updated', `Status changed to: ${nextStatus.replace(/_/g, ' ')}`, 'emerald');
       }
     } catch (err) {
       if (nextStatus === 'CASE_COMPLETED' || nextStatus === 'HANDOVER_COMPLETE') {
+        localStorage.removeItem('resq_active_emergency');
         setActiveEmergency(null);
+        window.dispatchEvent(new CustomEvent('resq-emergency-updated', { detail: null }));
         addToast('Mission Completed', 'Patient handover completed successfully.', 'emerald');
       } else {
-        setActiveEmergency((prev) => (prev ? { ...prev, status: nextStatus } : null));
+        localStorage.setItem('resq_active_emergency', JSON.stringify(updated));
+        setActiveEmergency(updated);
+        window.dispatchEvent(new CustomEvent('resq-emergency-updated', { detail: updated }));
         addToast('Mission Updated', `Status advanced to: ${nextStatus.replace(/_/g, ' ')}`, 'emerald');
       }
     }
@@ -459,6 +552,46 @@ export const DriverDashboard = () => {
             </div>
           </div>
 
+          {/* Incoming Emergency Alert Notification */}
+          {(!activeEmergency.status || activeEmergency.status === 'PENDING' || activeEmergency.status === 'REQUESTED' || activeEmergency.status === 'SEARCHING_AMBULANCE' || activeEmergency.status === 'ASSIGNED') && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.22) 0%, rgba(245, 158, 11, 0.18) 100%)',
+              border: '2px solid #EF4444',
+              borderRadius: '12px',
+              padding: '18px 22px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '16px',
+              boxShadow: '0 0 30px rgba(239, 68, 68, 0.35)',
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="pulsing-dot" style={{ background: '#EF4444', width: '12px', height: '12px' }} />
+                  <span style={{ color: '#FCA5A5', fontWeight: 800, fontSize: '0.92rem', letterSpacing: '0.05em' }}>
+                    🚨 INCOMING EMERGENCY REQUEST
+                  </span>
+                </div>
+                <div style={{ color: '#FFF', fontSize: '1.1rem', fontWeight: 800, marginTop: '4px' }}>
+                  Closest Available Unit Prioritized &bull; Tap to Accept Emergency
+                </div>
+                <div style={{ color: '#CBD5E1', fontSize: '0.85rem', marginTop: '2px' }}>
+                  Citizen Destination: <strong style={{ color: '#38BDF8' }}>{(activeEmergency.selected_hospital || activeEmergency.destination_hospital)?.name || 'Citizen Selected Hospital'}</strong>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleAcceptEmergency}
+                className="btn btn-lg btn-emerald"
+                style={{ fontWeight: 800, padding: '12px 28px', fontSize: '1.05rem', boxShadow: '0 0 20px rgba(16, 185, 129, 0.6)' }}
+              >
+                <UserCheck size={20} />
+                <span>ACCEPT EMERGENCY</span>
+              </button>
+            </div>
+          )}
+
           {/* Stepper One-Tap Quick Actions */}
           <div style={{ background: 'rgba(7, 11, 20, 0.6)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
             <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '12px', fontWeight: 600 }}>
@@ -466,14 +599,15 @@ export const DriverDashboard = () => {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               <button
-                onClick={() => handleAdvanceStatus('EN_ROUTE_TO_PICKUP')}
+                onClick={handleAcceptEmergency}
                 className={`btn btn-sm ${
                   activeEmergency.status === 'EN_ROUTE_TO_PICKUP' || activeEmergency.status === 'AMBULANCE_EN_ROUTE'
                     ? 'btn-primary'
-                    : 'btn-outline'
+                    : 'btn-emerald'
                 }`}
+                style={{ fontWeight: 700 }}
               >
-                1. Departed (En Route to Scene)
+                1. Accept &amp; En Route to Patient
               </button>
 
               <button
@@ -488,14 +622,16 @@ export const DriverDashboard = () => {
               </button>
 
               <button
-                onClick={() => handleAdvanceStatus('PATIENT_ONBOARD')}
+                onClick={() => setPickupModalOpen(true)}
                 className={`btn btn-sm ${
-                  activeEmergency.status === 'PATIENT_ONBOARD' || activeEmergency.status === 'EN_ROUTE_TO_HOSPITAL' || activeEmergency.status === 'IN_TRANSIT_TO_HOSPITAL'
+                  activeEmergency.status === 'PATIENT_ONBOARD' || activeEmergency.status === 'IN_TRANSIT_TO_HOSPITAL'
                     ? 'btn-primary'
-                    : 'btn-outline'
+                    : (activeEmergency.status === 'ARRIVED_AT_SCENE' || activeEmergency.status === 'ARRIVED_AT_PICKUP' ? 'btn-emerald' : 'btn-outline')
                 }`}
+                style={{ fontWeight: 700 }}
               >
-                3. Patient Loaded &bull; Transit to Hospital
+                <UserCheck size={14} />
+                <span>3. Patient Picked Up</span>
               </button>
 
               <button
@@ -571,6 +707,79 @@ export const DriverDashboard = () => {
             You are online and stationed. As soon as a high-priority emergency is reported near your sector, you will receive an immediate siren alert.
           </p>
           <span className="badge badge-emerald">GPS TELEMETRY BROADCASTING</span>
+        </div>
+      )}
+
+      {/* Patient Pickup Confirmation Modal */}
+      {pickupModalOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(7, 11, 20, 0.85)',
+          backdropFilter: 'blur(8px)',
+          padding: '16px',
+        }}>
+          <div className="glass-panel" style={{ maxWidth: '460px', width: '100%', padding: '28px', textAlign: 'center', border: '2px solid #38BDF8' }}>
+            <div style={{
+              width: '54px',
+              height: '54px',
+              borderRadius: '50%',
+              background: 'rgba(56, 189, 248, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+              border: '2px solid rgba(56, 189, 248, 0.3)'
+            }}>
+              <UserCheck size={28} color="#38BDF8" />
+            </div>
+            <h3 style={{ color: '#FFF', fontSize: '1.3rem', marginBottom: '8px', fontWeight: 800 }}>
+              Confirm Patient Pickup
+            </h3>
+            <p style={{ color: '#CBD5E1', fontSize: '0.95rem', marginBottom: '20px' }}>
+              Have you picked up the patient?
+            </p>
+            <div style={{
+              padding: '12px 14px',
+              borderRadius: '8px',
+              background: 'rgba(16, 185, 129, 0.08)',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+              marginBottom: '20px',
+              fontSize: '0.84rem',
+              color: '#94A3B8',
+              textAlign: 'left'
+            }}>
+              <div>Citizen Selected Destination:</div>
+              <div style={{ color: '#10B981', fontWeight: 700, fontSize: '0.92rem', marginTop: '2px' }}>
+                {(activeEmergency?.selected_hospital || activeEmergency?.destination_hospital)?.name || 'Citizen Selected Hospital'}
+              </div>
+              <div style={{ fontSize: '0.76rem', color: '#64748B', marginTop: '4px' }}>
+                Upon confirmation, ambulance navigates directly to this citizen-selected hospital ER.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setPickupModalOpen(false)}
+                className="btn btn-outline"
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPickup}
+                className="btn btn-emerald"
+                style={{ flex: 1.5, fontWeight: 700 }}
+              >
+                Confirm Pickup
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

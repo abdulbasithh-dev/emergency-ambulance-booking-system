@@ -22,7 +22,7 @@ const STATUS_STEPS = [
   { key: 'ASSIGNED', label: 'Ambulance Assigned', matches: ['ASSIGNED', 'AMBULANCE_ASSIGNED', 'DRIVER_ACCEPTED'] },
   { key: 'AMBULANCE_EN_ROUTE', label: 'En Route to You', matches: ['AMBULANCE_EN_ROUTE', 'EN_ROUTE_TO_PICKUP'] },
   { key: 'ARRIVED_AT_SCENE', label: 'On Scene', matches: ['ARRIVED_AT_SCENE', 'ARRIVED_AT_PICKUP'] },
-  { key: 'PATIENT_LOADED', label: 'Patient Loaded', matches: ['PATIENT_LOADED', 'PATIENT_ONBOARD'] },
+  { key: 'PATIENT_LOADED', label: 'Patient Picked Up', matches: ['PATIENT_LOADED', 'PATIENT_ONBOARD', 'PICKED_UP'] },
   { key: 'IN_TRANSIT_TO_HOSPITAL', label: 'Transit to Hospital', matches: ['IN_TRANSIT_TO_HOSPITAL', 'EN_ROUTE_TO_HOSPITAL', 'HOSPITAL_SELECTED'] },
   { key: 'ARRIVED_AT_HOSPITAL', label: 'At Hospital ER', matches: ['ARRIVED_AT_HOSPITAL'] },
   { key: 'HANDOVER_COMPLETE', label: 'Handover Complete', matches: ['HANDOVER_COMPLETE', 'CASE_COMPLETED'] },
@@ -47,7 +47,8 @@ const formatStatus = (status) => {
       return 'ARRIVED AT SCENE (ON SCENE)';
     case 'PATIENT_ONBOARD':
     case 'PATIENT_LOADED':
-      return 'PATIENT LOADED';
+    case 'PICKED_UP':
+      return 'PATIENT PICKED UP';
     case 'EN_ROUTE_TO_HOSPITAL':
     case 'IN_TRANSIT_TO_HOSPITAL':
     case 'HOSPITAL_SELECTED':
@@ -200,11 +201,19 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
     };
     window.addEventListener('resq-emergency-updated', handleCustomEmergencyUpdate);
 
+    const handleToastBroadcast = (e) => {
+      if (e.detail) {
+        addToast(e.detail.title, e.detail.message, e.detail.type || 'cyan');
+      }
+    };
+    window.addEventListener('resq-toast-broadcast', handleToastBroadcast);
+
     return () => {
       unsubscribe();
       window.removeEventListener('resq-emergency-updated', handleCustomEmergencyUpdate);
+      window.removeEventListener('resq-toast-broadcast', handleToastBroadcast);
     };
-  }, [fetchActive, subscribe]);
+  }, [fetchActive, subscribe, addToast]);
 
   const handleSelectHospital = async (hospitalId) => {
     if (!activeEmergency) return;
@@ -641,11 +650,11 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <h3 style={{ fontSize: '1.1rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#FFF' }}>
                 <Building2 size={18} color="#38BDF8" />
-                <span>Destination Hospital</span>
+                <span>Citizen-Selected Hospital</span>
               </h3>
               {hospital && (
-                <span className="badge badge-blue">
-                  CONFIRMED
+                <span className={`badge ${activeEmergency.hospital_decision === 'ACCEPTED' || activeEmergency.hospital_confirmed ? 'badge-emerald' : activeEmergency.hospital_decision === 'REJECTED' ? 'badge-crimson' : 'badge-blue'}`}>
+                  {activeEmergency.hospital_decision === 'ACCEPTED' || activeEmergency.hospital_confirmed ? '✓ HOSPITAL CONFIRMED' : activeEmergency.hospital_decision === 'REJECTED' ? '✕ REJECTED' : 'REQUEST SENT'}
                 </span>
               )}
             </div>
@@ -654,16 +663,21 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
               <div style={{
                 padding: '14px',
                 borderRadius: '10px',
-                background: 'rgba(59, 130, 246, 0.1)',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
+                background: activeEmergency.hospital_decision === 'ACCEPTED' || activeEmergency.hospital_confirmed ? 'rgba(16, 185, 129, 0.12)' : 'rgba(59, 130, 246, 0.1)',
+                border: activeEmergency.hospital_decision === 'ACCEPTED' || activeEmergency.hospital_confirmed ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(59, 130, 246, 0.3)',
                 marginBottom: '16px'
               }}>
-                <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#FFF' }}>{hospital.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#FFF' }}>{hospital.name}</div>
+                  <span style={{ fontSize: '0.75rem', color: activeEmergency.hospital_decision === 'ACCEPTED' || activeEmergency.hospital_confirmed ? '#34D399' : '#38BDF8', fontWeight: 600 }}>
+                    {activeEmergency.hospital_decision === 'ACCEPTED' || activeEmergency.hospital_confirmed ? 'ER Bay Confirmed' : 'Request Pending ER Triage'}
+                  </span>
+                </div>
                 <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '2px' }}>{hospital.address}</div>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '10px', fontSize: '0.8rem' }}>
-                  <div><strong style={{ color: '#38BDF8' }}>{hospital.icu_beds_available}</strong> ICU Beds</div>
-                  <div><strong style={{ color: '#10B981' }}>{hospital.general_beds_available}</strong> General Beds</div>
-                  <div>Status: <span style={{ color: '#34D399' }}>{hospital.emergency_department_status}</span></div>
+                  <div><strong style={{ color: '#38BDF8' }}>{hospital.icu_beds_available ?? 4}</strong> ICU Beds</div>
+                  <div><strong style={{ color: '#10B981' }}>{hospital.general_beds_available ?? 12}</strong> General Beds</div>
+                  <div>Status: <span style={{ color: '#34D399' }}>{hospital.emergency_department_status || 'ACCEPTING EMERGENCIES'}</span></div>
                 </div>
               </div>
             ) : (

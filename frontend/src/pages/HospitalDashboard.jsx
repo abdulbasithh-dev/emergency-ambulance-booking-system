@@ -101,11 +101,19 @@ export const HospitalDashboard = () => {
   const fetchData = useCallback(async () => {
     try {
       const allHosp = await hospitalAPI.getAll();
+      let activeHospList = DEMO_HOSPITALS;
       if (allHosp.data && allHosp.data.length > 0) {
+        activeHospList = allHosp.data;
         setHospitals(allHosp.data);
-        const currentId = selectedHospitalId || allHosp.data[0].id;
-        if (!selectedHospitalId) setSelectedHospitalId(currentId);
+      } else {
+        setHospitals(DEMO_HOSPITALS);
+      }
 
+      const currentId = selectedHospitalId || activeHospList[0].id;
+      if (!selectedHospitalId) setSelectedHospitalId(currentId);
+
+      let fetchedCases = [];
+      try {
         const hRes = await hospitalAPI.getOne(currentId);
         setHospital(hRes.data);
         setCapacity({
@@ -116,8 +124,59 @@ export const HospitalDashboard = () => {
         });
 
         const caseRes = await hospitalAPI.getCases(currentId);
-        setCases(caseRes.data || []);
+        fetchedCases = caseRes.data || [];
+      } catch {
+        const found = DEMO_HOSPITALS.find((h) => h.id === Number(currentId)) || DEMO_HOSPITALS[0];
+        setHospital(found);
+        setCapacity({
+          icu_beds_available: found.icu_beds_available,
+          general_beds_available: found.general_beds_available,
+          ventilators_available: found.ventilators_available,
+          status: found.emergency_department_status,
+        });
+        fetchedCases = DEMO_INBOUND_CASES;
       }
+
+      // Check for citizen-created active emergency in localStorage
+      try {
+        const saved = localStorage.getItem('resq_active_emergency');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const targetHospId = parsed.selected_hospital_id || parsed.hospital_id || parsed.selected_hospital?.id || parsed.selected_hospital?.hospital_id || 1;
+          if (Number(targetHospId) === Number(currentId) || !targetHospId) {
+            const exists = fetchedCases.some((c) => c.id === parsed.id || c.emergency_id === parsed.id);
+            if (!exists) {
+              fetchedCases = [
+                {
+                  id: parsed.id,
+                  emergency_id: parsed.id,
+                  emergency_type: parsed.emergency_type,
+                  severity: parsed.priority || parsed.severity_level || 'CRITICAL',
+                  status: parsed.status || 'IN_TRANSIT_TO_HOSPITAL',
+                  estimated_arrival_minutes: parsed.eta_minutes || parsed.estimated_eta_minutes || 6,
+                  patient_notes: parsed.description || parsed.notes || 'Emergency call dispatched by citizen',
+                  pickup_address: parsed.pickup_address,
+                  created_at: parsed.created_at || new Date().toISOString(),
+                  hospital_decision: parsed.hospital_decision || 'PENDING',
+                  emergency: parsed,
+                  ambulance: parsed.ambulance || {
+                    vehicle_number: 'TN-01-EM-9921',
+                    driver_name: 'Rajesh Kumar (ALS Paramedic)',
+                    ambulance_type: 'ALS (Advanced Life Support)',
+                  },
+                  user: {
+                    full_name: parsed.patient_name || 'Emergency Patient',
+                    phone_number: parsed.contact_number || parsed.contact_phone || '+91 98401 23456',
+                  }
+                },
+                ...fetchedCases
+              ];
+            }
+          }
+        }
+      } catch {}
+
+      setCases(fetchedCases);
     } catch (err) {
       console.warn('Live hospital API unreachable, operating with demo hospital facility');
       const found = DEMO_HOSPITALS.find((h) => h.id === Number(selectedHospitalId)) || DEMO_HOSPITALS[0];
@@ -138,6 +197,11 @@ export const HospitalDashboard = () => {
   useEffect(() => {
     fetchData();
 
+    const handleCustomEmergencyUpdate = () => {
+      fetchData();
+    };
+    window.addEventListener('resq-emergency-updated', handleCustomEmergencyUpdate);
+
     const unsubscribe = subscribe((msg) => {
       if (msg.event === 'NEW_INBOUND_AMBULANCE') {
         addToast('🚨 Inbound Patient Alert', `Approaching: ${msg.data?.emergency_type}`, 'crimson');
@@ -149,7 +213,10 @@ export const HospitalDashboard = () => {
       }
     });
 
-    return unsubscribe;
+    return () => {
+      window.removeEventListener('resq-emergency-updated', handleCustomEmergencyUpdate);
+      unsubscribe();
+    };
   }, [fetchData, subscribe, addToast]);
 
   const handleUpdateCapacity = async () => {
@@ -180,11 +247,49 @@ export const HospitalDashboard = () => {
         `Triaged via Hospital ER Portal`,
         'Dr. Ananya Roy'
       );
-      addToast('Triage Confirmed', `Case marked as ${action}`, 'emerald');
+      addToast('Triage Confirmed', `Case marked as ${action}`, action === 'ACCEPTED' ? 'emerald' : 'amber');
       fetchData();
     } catch (err) {
       setCases((prev) => prev.map((c) => (c.id === caseId ? { ...c, hospital_decision: action } : c)));
-      addToast('Triage Confirmed', `Inbound patient triage marked as ${action}`, 'emerald');
+      addToast('Triage Confirmed', `Inbound patient triage marked as ${action}`, action === 'ACCEPTED' ? 'emerald' : 'amber');
+    }
+
+    // Broadcast confirmation notification to citizen
+    if (action === 'ACCEPTED') {
+      window.dispatchEvent(new CustomEvent('resq-toast-broadcast', {
+        detail: {
+          title: 'Hospital Confirmed',
+          message: 'The hospital has accepted the incoming emergency.',
+          type: 'emerald'
+        }
+      }));
+      try {
+        const saved = localStorage.getItem('resq_active_emergency');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          parsed.hospital_decision = 'ACCEPTED';
+          parsed.hospital_confirmed = true;
+          localStorage.setItem('resq_active_emergency', JSON.stringify(parsed));
+          window.dispatchEvent(new CustomEvent('resq-emergency-updated', { detail: parsed }));
+        }
+      } catch {}
+    } else if (action === 'REJECTED' || action === 'DIVERTED') {
+      window.dispatchEvent(new CustomEvent('resq-toast-broadcast', {
+        detail: {
+          title: 'Hospital Notice',
+          message: 'Hospital ER was unable to accept, review required.',
+          type: 'crimson'
+        }
+      }));
+      try {
+        const saved = localStorage.getItem('resq_active_emergency');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          parsed.hospital_decision = 'REJECTED';
+          localStorage.setItem('resq_active_emergency', JSON.stringify(parsed));
+          window.dispatchEvent(new CustomEvent('resq-emergency-updated', { detail: parsed }));
+        }
+      } catch {}
     }
   };
 
@@ -444,22 +549,36 @@ export const HospitalDashboard = () => {
                       <div style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
                         Assigned ER Doctor: <strong style={{ color: '#38BDF8' }}>{c.assigned_doctor || 'ER On-Call Team'}</strong>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          onClick={() => handleTriageCase(c.id, 'ACCEPTED')}
-                          className="btn btn-sm btn-emerald"
-                        >
-                          <UserCheck size={14} />
-                          <span>Accept &amp; Prep ER</span>
-                        </button>
-                        <button
-                          onClick={() => handleTriageCase(c.id, 'DIVERTED')}
-                          className="btn btn-sm btn-danger-outline"
-                        >
-                          <XCircle size={14} />
-                          <span>Divert</span>
-                        </button>
-                      </div>
+                      {c.hospital_decision === 'ACCEPTED' ? (
+                        <span className="badge badge-emerald" style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px' }}>
+                          <CheckCircle2 size={13} />
+                          <span>Accepted &bull; ER Bay Prepared</span>
+                        </span>
+                      ) : c.hospital_decision === 'REJECTED' || c.hospital_decision === 'DIVERTED' ? (
+                        <span className="badge badge-crimson" style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px' }}>
+                          <XCircle size={13} />
+                          <span>Rejected &bull; Diversion Flagged</span>
+                        </span>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => handleTriageCase(c.id, 'ACCEPTED')}
+                            className="btn btn-sm btn-emerald"
+                            style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
+                          >
+                            <UserCheck size={14} />
+                            <span>Accept</span>
+                          </button>
+                          <button
+                            onClick={() => handleTriageCase(c.id, 'REJECTED')}
+                            className="btn btn-sm btn-danger-outline"
+                            style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
+                          >
+                            <XCircle size={14} />
+                            <span>Reject</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
