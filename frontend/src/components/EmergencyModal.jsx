@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { emergencyAPI, hospitalAPI } from '../api';
 import { useWebSocket } from '../context/WebSocketContext';
 import { STATIC_HOSPITALS } from '../constants/hospitals';
@@ -6,18 +6,14 @@ import {
   X,
   HeartPulse,
   MapPin,
-  AlertTriangle,
-  User,
-  Phone,
   Building2,
   CheckCircle2,
-  ArrowRight,
-  ArrowLeft,
   Bed,
-  Wind,
   ShieldCheck,
   Clock,
   Navigation,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 const CHENNAI_PRESETS = [
@@ -26,24 +22,23 @@ const CHENNAI_PRESETS = [
   { label: 'Adyar Signal, LB Road', lat: 13.0012, lng: 80.2565 },
   { label: 'Anna Nagar West Roundtana', lat: 13.0850, lng: 80.2101 },
   { label: 'Chennai Central Railway Station', lat: 13.0827, lng: 80.2707 },
-  { label: 'Mylapore Tank, Luz Corner', lat: 13.0339, lng: 80.2677 },
   { label: 'Velachery Bypass Road', lat: 12.9815, lng: 80.2180 },
 ];
 
 export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
   const { addToast } = useWebSocket();
-  const [step, setStep] = useState(1); // 1: Emergency & Patient, 2: Hospital Selection
   const [loading, setLoading] = useState(false);
   const [loadingHospitals, setLoadingHospitals] = useState(false);
   const [hospitals, setHospitals] = useState(STATIC_HOSPITALS);
   const [selectedHospital, setSelectedHospital] = useState(STATIC_HOSPITALS[0]);
+  const [showPatientForm, setShowPatientForm] = useState(false);
 
   const [formData, setFormData] = useState({
     emergency_type: 'CARDIAC_ARREST',
     severity_level: 'CRITICAL',
-    pickup_address: 'T. Nagar, Usman Road, Chennai',
-    pickup_latitude: 13.0418,
-    pickup_longitude: 80.2341,
+    pickup_address: '41, Potheri, SRM University Campus, Chennai',
+    pickup_latitude: 12.8235,
+    pickup_longitude: 80.0445,
     patient_name: 'Rajesh Kumar',
     patient_age: 52,
     patient_gender: 'Male',
@@ -51,25 +46,7 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
     notes: 'Sudden chest pain, difficulty breathing, conscious but in distress',
   });
 
-  // Reset step whenever modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setStep(1);
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const handlePresetSelect = (preset) => {
-    setFormData((prev) => ({
-      ...prev,
-      pickup_address: preset.label + ', Chennai',
-      pickup_latitude: preset.lat,
-      pickup_longitude: preset.lng,
-    }));
-  };
-
-  const loadHospitals = async () => {
+  const loadHospitals = useCallback(async () => {
     setLoadingHospitals(true);
     try {
       const typeMap = {
@@ -81,15 +58,15 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
         BURNS: 'Fire emergency',
         GENERAL_MEDICAL: 'Other',
       };
-      const emType = typeMap[formData.emergency_type] || 'Accident';
-      
+      const emType = typeMap[formData.emergency_type] || 'Cardiac emergency';
+
       const recRes = await hospitalAPI.getRecommendations(
         formData.pickup_latitude,
         formData.pickup_longitude,
         emType,
         formData.severity_level
       );
-      
+
       let list = Array.isArray(recRes.data) && recRes.data.length > 0 ? recRes.data : [];
       if (!list.length) {
         const allRes = await hospitalAPI.getAll();
@@ -119,48 +96,30 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
       if (list.length > 0) {
         setSelectedHospital(list[0]);
       }
-    } catch (err) {
-      console.warn('Live hospital recommendations unavailable, using verified trauma centers:', err);
-      try {
-        const fallbackRes = await hospitalAPI.getAll();
-        const fallbackList = Array.isArray(fallbackRes.data) && fallbackRes.data.length > 0 ? fallbackRes.data.map((h) => ({
-          hospital_id: h.id,
-          id: h.id,
-          name: h.name,
-          address: h.address,
-          phone: h.phone || h.phone_number,
-          distance_km: 5.0,
-          eta_minutes: 12,
-          icu_beds_available: h.icu_beds_available,
-          ventilators_available: h.ventilators_available,
-          emergency_dept_status: h.emergency_dept_status || h.emergency_department_status || 'NORMAL',
-          trauma_capable: h.trauma_capable ?? true,
-          cardiac_capable: h.cardiac_capable ?? true,
-        })) : [];
-        if (fallbackList.length > 0) {
-          setHospitals(fallbackList);
-          setSelectedHospital(fallbackList[0]);
-        } else {
-          setHospitals(STATIC_HOSPITALS);
-          setSelectedHospital(STATIC_HOSPITALS[0]);
-        }
-      } catch (e2) {
-        setHospitals(STATIC_HOSPITALS);
-        setSelectedHospital(STATIC_HOSPITALS[0]);
-      }
+    } catch {
+      setHospitals(STATIC_HOSPITALS);
+      setSelectedHospital(STATIC_HOSPITALS[0]);
     } finally {
       setLoadingHospitals(false);
     }
-  };
+  }, [formData.emergency_type, formData.pickup_latitude, formData.pickup_longitude, formData.severity_level]);
 
-  const handleGoToStep2 = (e) => {
-    e.preventDefault();
-    if (!formData.pickup_address) {
-      addToast('Error', 'Please enter a pickup address', 'amber');
-      return;
+  // Load hospitals immediately whenever modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadHospitals();
     }
-    loadHospitals();
-    setStep(2);
+  }, [isOpen, loadHospitals]);
+
+  if (!isOpen) return null;
+
+  const handlePresetSelect = (preset) => {
+    setFormData((prev) => ({
+      ...prev,
+      pickup_address: preset.label + ', Chennai',
+      pickup_latitude: preset.lat,
+      pickup_longitude: preset.lng,
+    }));
   };
 
   const handleSubmitEmergency = async () => {
@@ -186,23 +145,35 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
       emergency_type: typeMap[formData.emergency_type] || formData.emergency_type || 'Cardiac emergency',
       priority: formData.severity_level || formData.priority || 'CRITICAL',
       pickup_address: formData.pickup_address,
-      pickup_lat: formData.pickup_latitude ?? formData.pickup_lat ?? 13.0418,
-      pickup_lng: formData.pickup_longitude ?? formData.pickup_lng ?? 80.2341,
-      contact_number: formData.contact_phone || formData.contact_number || '+91 98401 23456',
-      description: formData.notes || formData.description || 'Emergency assistance requested',
+      pickup_lat: formData.pickup_latitude ?? 12.8235,
+      pickup_lng: formData.pickup_longitude ?? 80.0445,
+      contact_number: formData.contact_phone || '+91 98401 23456',
+      description: formData.notes || 'Emergency assistance requested',
       selected_hospital_id: targetHospId,
       hospital_id: targetHospId,
       preferred_hospital: targetHospName,
+      selected_hospital: targetHosp,
+      destination_hospital: targetHosp,
+      status: 'SEARCHING_AMBULANCE',
+      patient_status: 'WAITING_FOR_PICKUP',
+      hospital_decision: 'PENDING',
+      hospital_confirmed: false,
     };
 
     try {
       const res = await emergencyAPI.create(payload);
-      const emergencyData = res.data;
+      const emergencyData = {
+        ...res.data,
+        selected_hospital: targetHosp,
+        destination_hospital: targetHosp,
+        hospital_decision: 'PENDING',
+        hospital_confirmed: false,
+      };
       localStorage.setItem('resq_active_emergency', JSON.stringify(emergencyData));
       window.dispatchEvent(new CustomEvent('resq-emergency-updated', { detail: emergencyData }));
       addToast(
-        '🚨 SOS Ambulance Dispatched!',
-        `Assigned response unit en route to ${formData.pickup_address.split(',')[0]} • ER Destination: ${targetHospName}`,
+        '🚨 Emergency Dispatched',
+        `Hospital request sent to ${targetHospName} • Alerting closest ambulance`,
         'crimson'
       );
       if (onEmergencyCreated) {
@@ -210,38 +181,31 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
       }
       onClose();
     } catch (err) {
-      console.warn('Backend unavailable, dispatching demo emergency mission:', err);
+      console.warn('Backend offline, running live demo dispatch:', err);
       const mockEmergency = {
         id: Math.floor(Math.random() * 900) + 100,
         ...payload,
-        status: 'AMBULANCE_EN_ROUTE',
         created_at: new Date().toISOString(),
-        estimated_eta_minutes: 8,
-        estimated_distance_km: 3.4,
+        estimated_eta_minutes: 6,
+        estimated_distance_km: 2.8,
         ambulance: {
           id: 1,
           vehicle_number: 'TN-01-EM-9921',
           driver_name: 'Rajesh Kumar (ALS Paramedic)',
           driver_phone: '+91 98765 43210',
           ambulance_type: 'ALS (Advanced Life Support)',
-          current_lat: (formData.pickup_latitude ?? 13.0418) + 0.012,
-          current_lng: (formData.pickup_longitude ?? 80.2341) - 0.015,
-          current_latitude: (formData.pickup_latitude ?? 13.0418) + 0.012,
-          current_longitude: (formData.pickup_longitude ?? 80.2341) - 0.015,
+          current_lat: (formData.pickup_latitude ?? 12.8235) + 0.012,
+          current_lng: (formData.pickup_longitude ?? 80.0445) - 0.015,
+          current_latitude: (formData.pickup_latitude ?? 12.8235) + 0.012,
+          current_longitude: (formData.pickup_longitude ?? 80.0445) - 0.015,
           speed_kmh: 48.0,
         },
-        selected_hospital: targetHosp || {
-          name: targetHospName,
-          address: 'Greams Road, Chennai',
-          latitude: 13.0569,
-          longitude: 80.2525,
-        }
       };
       localStorage.setItem('resq_active_emergency', JSON.stringify(mockEmergency));
       window.dispatchEvent(new CustomEvent('resq-emergency-updated', { detail: mockEmergency }));
       addToast(
-        '🚨 SOS Ambulance Dispatched!',
-        `Response unit TN-01-EM-9921 en route • ER Destination: ${targetHospName}`,
+        '🚨 Emergency Dispatched',
+        `Hospital request sent to ${targetHospName} • Alerting closest ambulance`,
         'crimson'
       );
       if (onEmergencyCreated) {
@@ -266,21 +230,21 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
       backdropFilter: 'blur(14px)'
     }}>
       <div className="glass-panel" style={{
-        maxWidth: step === 2 ? '680px' : '580px',
+        maxWidth: '720px',
         width: '100%',
         maxHeight: '92vh',
         overflowY: 'auto',
-        padding: '28px',
+        padding: '26px',
         border: '1px solid rgba(239, 68, 68, 0.45)',
-        boxShadow: '0 0 40px rgba(239, 68, 68, 0.35)',
+        boxShadow: '0 0 45px rgba(239, 68, 68, 0.35)',
         transition: 'all 0.3s ease',
       }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
-              width: '40px',
-              height: '40px',
+              width: '42px',
+              height: '42px',
               borderRadius: '10px',
               backgroundColor: 'rgba(239, 68, 68, 0.2)',
               display: 'flex',
@@ -288,16 +252,14 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
               justifyContent: 'center',
               border: '1px solid rgba(239, 68, 68, 0.4)'
             }}>
-              {step === 1 ? <HeartPulse size={24} color="#EF4444" /> : <Building2 size={24} color="#38BDF8" />}
+              <HeartPulse size={24} color="#EF4444" />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.35rem', color: '#FFF', margin: 0, fontWeight: 700 }}>
-                {step === 1 ? 'Request Emergency Ambulance' : 'Select Destination Hospital ER'}
+              <h2 style={{ fontSize: '1.35rem', color: '#FFF', margin: 0, fontWeight: 800 }}>
+                🚨 Emergency Request &amp; Hospital Selection
               </h2>
-              <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: '3px 0 0 0' }}>
-                {step === 1
-                  ? 'Step 1 of 2: Patient & Medical Triage Information'
-                  : 'Step 2 of 2: Choose which hospital you want the ambulance to take you'}
+              <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: '2px 0 0 0' }}>
+                Select nearest hospital ER &bull; Closest available ambulance will be alerted with your location
               </p>
             </div>
           </div>
@@ -309,416 +271,317 @@ export const EmergencyModal = ({ isOpen, onClose, onEmergencyCreated }) => {
           </button>
         </div>
 
-        {/* Step Progress Bar */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-          <div style={{
-            flex: 1,
-            height: '4px',
-            borderRadius: '2px',
-            backgroundColor: '#EF4444',
-            transition: 'background 0.3s'
-          }} />
-          <div style={{
-            flex: 1,
-            height: '4px',
-            borderRadius: '2px',
-            backgroundColor: step === 2 ? '#38BDF8' : 'rgba(255, 255, 255, 0.12)',
-            transition: 'background 0.3s'
-          }} />
+        {/* 1. Citizen Location Detection Banner */}
+        <div style={{
+          padding: '12px 14px',
+          borderRadius: '10px',
+          background: 'rgba(56, 189, 248, 0.08)',
+          border: '1px solid rgba(56, 189, 248, 0.25)',
+          marginBottom: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: '#38BDF8', fontWeight: 700 }}>
+              <Navigation size={14} />
+              <span>DETECTED CITIZEN PICKUP LOCATION</span>
+            </div>
+            <span className="badge badge-emerald" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+              GPS LOCK ACTIVE
+            </span>
+          </div>
+
+          {/* Quick Location Chips */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {CHENNAI_PRESETS.map((p) => (
+              <button
+                type="button"
+                key={p.label}
+                onClick={() => handlePresetSelect(p)}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.74rem',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  background: formData.pickup_latitude === p.lat ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.04)',
+                  color: formData.pickup_latitude === p.lat ? '#38BDF8' : '#CBD5E1',
+                  cursor: 'pointer',
+                  fontWeight: formData.pickup_latitude === p.lat ? 700 : 400,
+                }}
+              >
+                📍 {p.label.split(',')[0]}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              required
+              value={formData.pickup_address}
+              onChange={(e) => setFormData({ ...formData, pickup_address: e.target.value })}
+              className="input-field"
+              placeholder="Full street address / landmark"
+              style={{ paddingLeft: '34px', fontSize: '0.85rem' }}
+            />
+            <MapPin size={15} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+          </div>
         </div>
 
-        {/* STEP 1: Emergency & Patient Info */}
-        {step === 1 && (
-          <form onSubmit={handleGoToStep2} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Emergency Type & Severity */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#E2E8F0', marginBottom: '6px' }}>
-                  Emergency Nature
-                </label>
-                <select
-                  value={formData.emergency_type}
-                  onChange={(e) => setFormData({ ...formData, emergency_type: e.target.value })}
-                  className="input-field"
-                >
-                  <option value="CARDIAC_ARREST">Cardiac Arrest / Heart Attack</option>
-                  <option value="TRAUMA_ACCIDENT">Severe Trauma / Road Accident</option>
-                  <option value="RESPIRATORY_DISTRESS">Respiratory Distress / Asphyxia</option>
-                  <option value="STROKE">Stroke / Neurological</option>
-                  <option value="PREGNANCY_COMPLICATIONS">Pregnancy / Labor Emergency</option>
-                  <option value="BURNS">Severe Burns</option>
-                  <option value="GENERAL_MEDICAL">General Critical Medical</option>
-                </select>
-              </div>
+        {/* 2. Quick Emergency Nature Selector */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#E2E8F0', marginBottom: '8px' }}>
+            Emergency Nature:
+          </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {[
+              { id: 'CARDIAC_ARREST', label: '❤️ Cardiac Emergency' },
+              { id: 'TRAUMA_ACCIDENT', label: '🚗 Severe Trauma / Accident' },
+              { id: 'RESPIRATORY_DISTRESS', label: '🫁 Breathing Distress' },
+              { id: 'STROKE', label: '🧠 Stroke / Neuro' },
+              { id: 'GENERAL_MEDICAL', label: '🏥 General Medical' },
+            ].map((t) => (
+              <button
+                type="button"
+                key={t.id}
+                onClick={() => setFormData({ ...formData, emergency_type: t.id })}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: formData.emergency_type === t.id ? 700 : 500,
+                  background: formData.emergency_type === t.id ? '#EF4444' : 'rgba(255, 255, 255, 0.05)',
+                  color: '#FFF',
+                  border: formData.emergency_type === t.id ? '1px solid #EF4444' : '1px solid rgba(255, 255, 255, 0.12)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#E2E8F0', marginBottom: '6px' }}>
-                  Severity
-                </label>
-                <select
-                  value={formData.severity_level}
-                  onChange={(e) => setFormData({ ...formData, severity_level: e.target.value })}
-                  className="input-field"
-                  style={{
-                    color: formData.severity_level === 'CRITICAL' ? '#EF4444' : '#F59E0B',
-                    fontWeight: 600
-                  }}
-                >
-                  <option value="CRITICAL">Critical (Life Threatening)</option>
-                  <option value="SEVERE">Severe (Urgent Care)</option>
-                  <option value="MODERATE">Moderate</option>
-                  <option value="MILD">Mild</option>
-                </select>
-              </div>
+        {/* 3. NEAREST AVAILABLE HOSPITALS LIST (Core Requirement) */}
+        <div style={{ marginBottom: '18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <label style={{ fontSize: '0.88rem', fontWeight: 800, color: '#FFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Building2 size={16} color="#38BDF8" />
+              <span>Select Nearest Destination Hospital:</span>
+            </label>
+            <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
+              {hospitals.length} Trauma Centers Available
+            </span>
+          </div>
+
+          {loadingHospitals ? (
+            <div style={{ padding: '36px', textAlign: 'center', color: '#94A3B8' }}>
+              <div className="pulsing-dot" style={{ margin: '0 auto 12px' }} />
+              <div>Querying nearby emergency departments &amp; ICU bed counts...</div>
             </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
+              {hospitals.map((hosp, idx) => {
+                const hospId = hosp.hospital_id || hosp.id;
+                const isSelected = selectedHospital && (selectedHospital.hospital_id === hospId || selectedHospital.id === hospId);
 
-            {/* Quick Location Presets */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#E2E8F0', marginBottom: '6px' }}>
-                Pickup Location (Select Chennai Area or Custom Address)
-              </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
-                {CHENNAI_PRESETS.map((p) => (
-                  <button
-                    type="button"
-                    key={p.label}
-                    onClick={() => handlePresetSelect(p)}
+                return (
+                  <div
+                    key={hospId}
+                    onClick={() => setSelectedHospital(hosp)}
                     style={{
-                      padding: '5px 10px',
-                      fontSize: '0.74rem',
-                      borderRadius: '6px',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
-                      background: formData.pickup_latitude === p.lat ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
-                      color: formData.pickup_latitude === p.lat ? '#38BDF8' : '#CBD5E1',
+                      padding: '12px 14px',
+                      borderRadius: '10px',
+                      border: isSelected ? '2px solid #38BDF8' : '1px solid rgba(255, 255, 255, 0.1)',
+                      background: isSelected ? 'rgba(56, 189, 248, 0.14)' : 'rgba(255, 255, 255, 0.03)',
                       cursor: 'pointer',
-                      fontWeight: formData.pickup_latitude === p.lat ? 600 : 400,
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
                     }}
                   >
-                    {p.label.split(',')[0]}
-                  </button>
-                ))}
-              </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                        <h4 style={{ margin: 0, fontSize: '0.94rem', color: isSelected ? '#38BDF8' : '#FFF', fontWeight: 700 }}>
+                          {hosp.name}
+                        </h4>
+                        {idx === 0 && (
+                          <span className="badge badge-emerald" style={{ fontSize: '0.66rem', padding: '2px 6px' }}>
+                            Closest / AI Recommended
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.76rem', color: '#94A3B8' }}>
+                        {hosp.address}
+                      </p>
 
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="text"
-                  required
-                  value={formData.pickup_address}
-                  onChange={(e) => setFormData({ ...formData, pickup_address: e.target.value })}
-                  className="input-field"
-                  placeholder="Full street address / landmark"
-                  style={{ paddingLeft: '36px' }}
-                />
-                <MapPin size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-              </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px', fontSize: '0.74rem' }}>
+                        <span style={{ color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                          <Bed size={12} />
+                          {hosp.icu_beds_available ?? 6} ICU Beds
+                        </span>
+                        <span style={{ color: '#F59E0B', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Clock size={12} />
+                          ~{hosp.eta_minutes ?? 10} mins ({hosp.distance_km ?? 4.2} km)
+                        </span>
+                        {hosp.cardiac_capable && (
+                          <span style={{ color: '#EF4444', fontSize: '0.68rem', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '1px 5px', borderRadius: '4px' }}>
+                            Cath Lab Ready
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Radio Ring */}
+                    <div style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      border: isSelected ? '2px solid #38BDF8' : '2px solid rgba(255, 255, 255, 0.25)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: isSelected ? '#38BDF8' : 'transparent',
+                      flexShrink: 0,
+                    }}>
+                      {isSelected && <CheckCircle2 size={16} color="#070B14" />}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+          )}
+        </div>
 
-            {/* Patient Details */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.8fr 1fr', gap: '10px' }}>
+        {/* 4. Optional Patient Details Accordion */}
+        <div style={{ marginBottom: '18px' }}>
+          <button
+            type="button"
+            onClick={() => setShowPatientForm(!showPatientForm)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#38BDF8',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: 0,
+              marginBottom: showPatientForm ? '10px' : '0',
+            }}
+          >
+            <span>Patient Information (Optional &bull; Pre-filled)</span>
+            {showPatientForm ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </button>
+
+          {showPatientForm && (
+            <div style={{
+              padding: '12px',
+              borderRadius: '8px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid var(--border-subtle)',
+              display: 'grid',
+              gridTemplateColumns: '1.2fr 0.8fr 1fr',
+              gap: '10px'
+            }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#E2E8F0', marginBottom: '6px' }}>
-                  Patient Name
-                </label>
+                <label style={{ display: 'block', fontSize: '0.74rem', color: '#94A3B8', marginBottom: '4px' }}>Patient Name</label>
                 <input
                   type="text"
                   value={formData.patient_name}
                   onChange={(e) => setFormData({ ...formData, patient_name: e.target.value })}
                   className="input-field"
-                  placeholder="Full Name"
+                  style={{ fontSize: '0.82rem' }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#E2E8F0', marginBottom: '6px' }}>
-                  Age
-                </label>
+                <label style={{ display: 'block', fontSize: '0.74rem', color: '#94A3B8', marginBottom: '4px' }}>Age</label>
                 <input
                   type="number"
                   value={formData.patient_age}
-                  onChange={(e) => setFormData({ ...formData, patient_age: parseInt(e.target.value) || '' })}
+                  onChange={(e) => setFormData({ ...formData, patient_age: parseInt(e.target.value) || 45 })}
                   className="input-field"
-                  placeholder="52"
+                  style={{ fontSize: '0.82rem' }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#E2E8F0', marginBottom: '6px' }}>
-                  Gender
-                </label>
-                <select
-                  value={formData.patient_gender}
-                  onChange={(e) => setFormData({ ...formData, patient_gender: e.target.value })}
-                  className="input-field"
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Contact Phone */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#E2E8F0', marginBottom: '6px' }}>
-                Emergency Contact Phone
-              </label>
-              <div style={{ position: 'relative' }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', color: '#94A3B8', marginBottom: '4px' }}>Contact Phone</label>
                 <input
                   type="tel"
-                  required
                   value={formData.contact_phone}
                   onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
                   className="input-field"
-                  placeholder="+91 98401 XXXXX"
-                  style={{ paddingLeft: '36px' }}
+                  style={{ fontSize: '0.82rem' }}
                 />
-                <Phone size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               </div>
             </div>
+          )}
+        </div>
 
-            {/* Clinical Notes */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#E2E8F0', marginBottom: '6px' }}>
-                Condition Details / Symptoms
-              </label>
-              <textarea
-                rows={2}
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="input-field"
-                placeholder="E.g. unconscious, severe chest pain, breathing difficulty..."
-                style={{ resize: 'none' }}
-              />
-            </div>
-
-            {/* Step 1 Actions */}
-            <div style={{ marginTop: '8px', display: 'flex', gap: '12px' }}>
-              <button
-                type="button"
-                onClick={onClose}
-                className="btn btn-outline"
-                style={{ flex: 1 }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                style={{
-                  flex: 2,
-                  fontSize: '1rem',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
-              >
-                <span>Continue: Choose Hospital ER</span>
-                <ArrowRight size={18} />
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* STEP 2: Which Hospital Do You Want? */}
-        {step === 2 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Quick Summary Pill */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              background: 'rgba(56, 189, 248, 0.08)',
-              border: '1px solid rgba(56, 189, 248, 0.25)',
-              fontSize: '0.82rem',
-              color: '#CBD5E1',
-            }}>
-              <div>
-                <strong style={{ color: '#EF4444' }}>{formData.emergency_type.replace(/_/g, ' ')}</strong>
-                {' • '}
-                <span style={{ color: '#38BDF8' }}>{formData.severity_level}</span>
-                {' • '}
-                <span>Pickup: {formData.pickup_address.split(',')[0]}</span>
+        {/* Selected Destination Summary Card */}
+        {selectedHospital && (
+          <div style={{
+            padding: '12px 14px',
+            borderRadius: '8px',
+            background: 'rgba(16, 185, 129, 0.08)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <ShieldCheck size={20} color="#10B981" />
+            <div style={{ fontSize: '0.82rem', color: '#E2E8F0' }}>
+              Selected Destination ER: <strong style={{ color: '#10B981' }}>{selectedHospital.name}</strong>
+              <div style={{ color: '#94A3B8', fontSize: '0.75rem', marginTop: '2px' }}>
+                Request will be transmitted directly to this facility &amp; closest available ambulance driver will be alerted.
               </div>
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#38BDF8',
-                  cursor: 'pointer',
-                  fontSize: '0.78rem',
-                  textDecoration: 'underline',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                <ArrowLeft size={14} />
-                <span>Edit Details</span>
-              </button>
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <label style={{ fontSize: '0.88rem', fontWeight: 700, color: '#FFF' }}>
-                  Select Which Hospital You Want:
-                </label>
-                <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
-                  {hospitals.length} emergency trauma centers available
-                </span>
-              </div>
-
-              {loadingHospitals ? (
-                <div style={{ padding: '36px', textAlign: 'center', color: '#94A3B8' }}>
-                  <div className="pulsing-dot" style={{ margin: '0 auto 12px' }} />
-                  <div>Querying nearby emergency departments &amp; ICU bed counts...</div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '340px', overflowY: 'auto' }}>
-                  {hospitals.map((hosp, idx) => {
-                    const hospId = hosp.hospital_id || hosp.id;
-                    const isSelected = selectedHospital && (selectedHospital.hospital_id === hospId || selectedHospital.id === hospId);
-
-                    return (
-                      <div
-                        key={hospId}
-                        onClick={() => setSelectedHospital(hosp)}
-                        style={{
-                          padding: '14px 16px',
-                          borderRadius: '10px',
-                          border: isSelected
-                            ? '2px solid #38BDF8'
-                            : '1px solid rgba(255, 255, 255, 0.1)',
-                          background: isSelected
-                            ? 'rgba(56, 189, 248, 0.12)'
-                            : 'rgba(255, 255, 255, 0.03)',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
-                        }}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <h4 style={{ margin: 0, fontSize: '0.98rem', color: isSelected ? '#38BDF8' : '#FFF', fontWeight: 700 }}>
-                              {hosp.name}
-                            </h4>
-                            {idx === 0 && (
-                              <span className="badge badge-emerald" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
-                                AI Recommended
-                              </span>
-                            )}
-                          </div>
-                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#94A3B8' }}>
-                            {hosp.address}
-                          </p>
-
-                          {/* Quick Clinical Metrics */}
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '6px', fontSize: '0.75rem' }}>
-                            <span style={{ color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
-                              <Bed size={13} />
-                              {hosp.icu_beds_available ?? 6} ICU Beds
-                            </span>
-                            <span style={{ color: '#38BDF8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Wind size={13} />
-                              {hosp.ventilators_available ?? 4} Ventilators
-                            </span>
-                            <span style={{ color: '#F59E0B', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Clock size={13} />
-                              ~{hosp.eta_minutes ?? 10} mins ({hosp.distance_km ?? 4.2} km)
-                            </span>
-                            {hosp.cardiac_capable && (
-                              <span style={{ color: '#EF4444', fontSize: '0.7rem', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '1px 5px', borderRadius: '4px' }}>
-                                Cardiac ICU
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Radio Checkmark */}
-                        <div style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          border: isSelected ? '2px solid #38BDF8' : '2px solid rgba(255, 255, 255, 0.2)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: isSelected ? '#38BDF8' : 'transparent',
-                          flexShrink: 0,
-                        }}>
-                          {isSelected && <CheckCircle2 size={16} color="#070B14" />}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Selected Hospital Confirmation Banner */}
-            {selectedHospital && (
-              <div style={{
-                padding: '12px 16px',
-                borderRadius: '8px',
-                background: 'rgba(16, 185, 129, 0.1)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px'
-              }}>
-                <ShieldCheck size={20} color="#10B981" />
-                <div style={{ fontSize: '0.82rem', color: '#E2E8F0' }}>
-                  Target ER: <strong>{selectedHospital.name}</strong>
-                  <br />
-                  <span style={{ color: '#94A3B8', fontSize: '0.76rem' }}>
-                    Upon dispatch, driver will navigate directly to pickup then transfer patient to this ER.
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Step 2 Actions */}
-            <div style={{ marginTop: '8px', display: 'flex', gap: '12px' }}>
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="btn btn-outline"
-                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-              >
-                <ArrowLeft size={16} />
-                <span>Back</span>
-              </button>
-              <button
-                type="button"
-                disabled={loading || !selectedHospital}
-                onClick={handleSubmitEmergency}
-                className="btn btn-primary"
-                style={{
-                  flex: 2,
-                  fontSize: '1rem',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
-              >
-                {loading ? 'Dispatching Nearest Unit...' : (
-                  <>
-                    <HeartPulse size={18} />
-                    <span>🚨 Confirm Hospital &amp; Dispatch Ambulance</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
         )}
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-outline"
+            style={{ flex: 1 }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={loading || !selectedHospital}
+            onClick={handleSubmitEmergency}
+            className="btn btn-primary"
+            style={{
+              flex: 2.5,
+              fontSize: '1rem',
+              fontWeight: 800,
+              padding: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              background: '#EF4444',
+              boxShadow: '0 0 20px rgba(239, 68, 68, 0.5)'
+            }}
+          >
+            {loading ? 'Alerting Emergency Network...' : (
+              <>
+                <HeartPulse size={20} />
+                <span>🚨 Confirm Hospital &amp; Alert Nearest Ambulance</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
