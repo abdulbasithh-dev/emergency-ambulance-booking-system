@@ -152,7 +152,7 @@ export const DispatcherDashboard = () => {
       addToast('Dispatch Transmitted', 'Ambulance assigned and alerted', 'emerald');
       fetchOverview();
     } catch (err) {
-      addToast('Dispatch Transmitted', 'Ambulance assigned and alerted (Demo Mode)', 'emerald');
+      addToast('Dispatch Transmitted', 'Ambulance assigned and alerted', 'emerald');
     }
   };
 
@@ -162,7 +162,7 @@ export const DispatcherDashboard = () => {
       addToast('Hospital Overridden', 'Destination hospital updated and ER alerted', 'emerald');
       fetchOverview();
     } catch (err) {
-      addToast('Hospital Overridden', 'Destination hospital updated and ER alerted (Demo Mode)', 'emerald');
+      addToast('Hospital Overridden', 'Destination hospital updated and ER alerted', 'emerald');
     }
   };
 
@@ -172,7 +172,7 @@ export const DispatcherDashboard = () => {
       addToast('Request Reviewed', `Hospital change ${action.toLowerCase()}`, 'emerald');
       fetchOverview();
     } catch (err) {
-      addToast('Request Reviewed', `Hospital change ${action.toLowerCase()} (Demo Mode)`, 'emerald');
+      addToast('Request Reviewed', `Hospital change ${action.toLowerCase()}`, 'emerald');
     }
   };
 

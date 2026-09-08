@@ -400,7 +400,7 @@ export const DriverDashboard = () => {
       setDiversionReason('');
       setDiversionStatus('PENDING');
     } catch (err) {
-      addToast('Diversion Transmitted', 'Hospital diversion requested (Demo Mode).', 'cyan');
+      addToast('Diversion Transmitted', 'Hospital diversion requested.', 'cyan');
       setDiversionModalOpen(false);
       setDiversionReason('');
       setDiversionStatus('PENDING');

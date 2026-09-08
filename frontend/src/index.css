@@ -415,18 +415,41 @@ select.input-field option {
   color: var(--text-secondary) !important;
 }
 
-/* Top Demo Bar */
+/* Top Clean Single Navigation Bar */
 .demo-bar {
   background: linear-gradient(90deg, #111827 0%, #1E1B4B 50%, #111827 100%);
   border-bottom: 1px solid rgba(99, 102, 241, 0.3);
-  padding: 8px 16px;
+  padding: 10px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 14px;
   position: sticky;
   top: 0;
   z-index: 1000;
   backdrop-filter: blur(10px);
+  flex-wrap: wrap;
+}
+
+.demo-nav-roles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 960px) {
+  .demo-bar {
+    padding: 8px 14px;
+    gap: 10px;
+  }
+  .demo-nav-roles {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
 }
 
 /* Toast Notifications */

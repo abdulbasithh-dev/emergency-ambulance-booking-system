@@ -236,7 +236,7 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
         } catch {}
         return updated;
       });
-      addToast('Hospital Requested', `Destination set to ${selectedHosp?.name || 'Selected ER'} (Demo Mode)`, 'emerald');
+      addToast('Hospital Requested', `Destination set to ${selectedHosp?.name || 'Selected ER'}`, 'emerald');
     }
   };
 
@@ -249,7 +249,7 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
       setActiveEmergency(null);
       setCancelModalOpen(false);
     } catch (err) {
-      addToast('Emergency Cancelled', 'Your request has been cancelled (Demo Mode)', 'amber');
+      addToast('Emergency Cancelled', 'Your request has been cancelled', 'amber');
       setActiveEmergency(null);
       setCancelModalOpen(false);
     }

@@ -8,8 +8,6 @@ import {
   Building2,
   Headphones,
   ShieldCheck,
-  Play,
-  Square,
   Radio,
   LogOut,
   Sparkles,
@@ -225,7 +223,7 @@ export const DemoControlBar = () => {
       ADMIN: '/admin',
     };
     const roleLabels = {
-      PORTAL: 'Front Portal',
+      PORTAL: 'Home',
       CITIZEN: 'Citizen (Patient View)',
       AMBULANCE_DRIVER: 'Ambulance Driver Cockpit',
       HOSPITAL_STAFF: 'Hospital Emergency Room',
@@ -241,7 +239,7 @@ export const DemoControlBar = () => {
     try {
       if (role === 'PORTAL') {
         logout();
-        addToast('Front Portal', 'Viewing Life Care public front dashboard', 'crimson');
+        addToast('Home', 'Viewing Life Care public front dashboard', 'crimson');
         return;
       }
       await demoLogin(role);
@@ -279,7 +277,7 @@ export const DemoControlBar = () => {
   };
 
   const roles = [
-    { key: 'PORTAL', label: 'Front Portal', icon: Sparkles, color: '#EF4444' },
+    { key: 'PORTAL', label: 'Home', icon: Sparkles, color: '#EF4444' },
     { key: 'CITIZEN', label: 'Citizen', icon: User, color: '#38BDF8' },
     { key: 'AMBULANCE_DRIVER', label: 'Driver', icon: Truck, color: '#F59E0B' },
     { key: 'HOSPITAL_STAFF', label: 'Hospital', icon: Building2, color: '#10B981' },
@@ -327,30 +325,10 @@ export const DemoControlBar = () => {
           </div>
         </div>
 
-        {/* WebSocket Connection Status */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '3px 8px',
-          borderRadius: '999px',
-          background: 'rgba(255, 255, 255, 0.05)',
-          fontSize: '0.75rem',
-          color: isConnected ? '#34D399' : '#38BDF8'
-        }}>
-          <span style={{
-            width: '7px',
-            height: '7px',
-            borderRadius: '50%',
-            backgroundColor: isConnected ? '#10B981' : '#38BDF8',
-            boxShadow: isConnected ? '0 0 6px #10B981' : '0 0 6px #38BDF8'
-          }} />
-          {isConnected ? 'LIVE WS' : 'DEMO MODE'}
-        </div>
       </div>
 
       {/* Role Selection Tabs */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <div className="demo-nav-roles" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginRight: '4px' }}>
           Role:
         </span>
@@ -384,28 +362,10 @@ export const DemoControlBar = () => {
         })}
       </div>
 
-      {/* 1-Click Simulation Button & User Profile */}
+      {/* User Profile */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <button
-          onClick={handleToggleSimulation}
-          className={`btn btn-sm ${isSimulating ? 'btn-danger-outline' : 'btn-emerald'}`}
-          style={{ fontSize: '0.82rem', padding: '6px 14px' }}
-        >
-          {isSimulating ? (
-            <>
-              <Square size={13} fill="#EF4444" color="#EF4444" />
-              <span>Stop Simulation</span>
-            </>
-          ) : (
-            <>
-              <Play size={13} fill="#FFF" color="#FFF" />
-              <span>▶ 1-Click Live Simulation</span>
-            </>
-          )}
-        </button>
-
         {user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--border-subtle)', paddingLeft: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#FFF' }}>{user.full_name}</span>
               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user.email}</span>

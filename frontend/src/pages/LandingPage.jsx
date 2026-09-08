@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { emergencyAPI } from '../api';
 import { LiveMap } from '../components/LiveMap';
 import {
-  PhoneCall,
   ArrowRight,
   MapPin,
   Clock,
@@ -22,7 +21,6 @@ import {
 
 export const LandingPage = ({ onOpenEmergencyModal }) => {
   const { user, demoLogin } = useAuth();
-  const [activeNav, setActiveNav] = useState('Home');
   const [bookingIdInput, setBookingIdInput] = useState('');
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [trackingFeedback, setTrackingFeedback] = useState(null);
@@ -85,109 +83,7 @@ export const LandingPage = ({ onOpenEmergencyModal }) => {
 
   return (
     <div className="lifecare-portal">
-      {/* 1. Life Care Top Navigation Bar */}
-      <nav className="lifecare-header">
-        <div style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '16px'
-        }}>
-          {/* Logo Branding */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => scrollToSection('hero-section')}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: '#EF4444',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(239, 68, 68, 0.45)',
-            }}>
-              {/* Crisp Medical Cross Emblem */}
-              <div style={{ position: 'relative', width: '20px', height: '20px' }}>
-                <div style={{ position: 'absolute', top: '7px', left: '0', width: '20px', height: '6px', background: '#FFF', borderRadius: '2px' }} />
-                <div style={{ position: 'absolute', top: '0', left: '7px', width: '6px', height: '20px', background: '#FFF', borderRadius: '2px' }} />
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#FFF', lineHeight: 1.1 }}>
-                LIFE <span style={{ color: '#EF4444' }}>CARE</span>
-              </div>
-              <div style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.12em', color: '#94A3B8', textTransform: 'uppercase' }}>
-                AMBULANCE SERVICE
-              </div>
-            </div>
-          </div>
-
-          {/* Navigation Links */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-            {[
-              { name: 'Home', action: () => scrollToSection('hero-section') },
-              { name: 'About Us', action: () => scrollToSection('trust-section') },
-              { name: 'Live Ambulance', action: () => scrollToSection('ambulance-radar-section') },
-              { name: 'Track Ambulance', action: () => scrollToSection('track-section') },
-              { name: 'Hospitals', action: () => handleBookNow() },
-              { name: 'Contact Us', action: () => window.open('tel:+911234567890') },
-            ].map((item) => (
-              <button
-                key={item.name}
-                onClick={() => {
-                  setActiveNav(item.name);
-                  item.action();
-                }}
-                className={`lifecare-nav-link ${activeNav === item.name ? 'active' : ''}`}
-              >
-                {item.name}
-              </button>
-            ))}
-          </div>
-
-          {/* Right Hotline & Book Now Button */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* 24/7 Helpline Pill */}
-            <a href="tel:+911234567890" className="lifecare-phone-pill" title="Call 24/7 Emergency Helpline">
-              <div style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                background: '#EF4444',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFF',
-                boxShadow: '0 0 10px rgba(239, 68, 68, 0.4)'
-              }}>
-                <PhoneCall size={16} />
-              </div>
-              <div>
-                <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600, letterSpacing: '0.04em' }}>
-                  24/7 Emergency
-                </div>
-                <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#FFF', letterSpacing: '-0.01em' }}>
-                  +91 12345 67890
-                </div>
-              </div>
-            </a>
-
-            {/* Primary CTA Book Now */}
-            <button
-              onClick={() => handleBookNow()}
-              className="lifecare-btn-red"
-              style={{ padding: '10px 22px', fontSize: '0.92rem' }}
-            >
-              <span>Book Now</span>
-              <ArrowRight size={16} />
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* 2. Hero Section */}
+      {/* Hero Section */}
       <header
         id="hero-section"
         style={{

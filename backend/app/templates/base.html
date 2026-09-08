@@ -97,16 +97,16 @@
       <!-- Role Switcher Pills -->
       <nav style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
         <a href="/" class="demo-role-btn {% if active_page == 'portal' %}active{% endif %}" data-path="/" onclick="RESQ.switchRole('PORTAL', '/'); return false;">
-          <span>🌟</span> Front Portal
+          <span>🌟</span> Home
         </a>
         <a href="/citizen" class="demo-role-btn {% if active_page == 'citizen' %}active{% endif %}" data-path="/citizen" onclick="RESQ.switchRole('CITIZEN', '/citizen'); return false;">
-          <span>👤</span> Citizen SOS
+          <span>👤</span> Citizen
         </a>
         <a href="/driver" class="demo-role-btn {% if active_page == 'driver' %}active{% endif %}" data-path="/driver" onclick="RESQ.switchRole('AMBULANCE_DRIVER', '/driver'); return false;">
-          <span>🚑</span> Driver HUD
+          <span>🚑</span> Driver
         </a>
         <a href="/hospital" class="demo-role-btn {% if active_page == 'hospital' %}active{% endif %}" data-path="/hospital" onclick="RESQ.switchRole('HOSPITAL_STAFF', '/hospital'); return false;">
-          <span>🏥</span> Hospital ER
+          <span>🏥</span> Hospital
         </a>
         <a href="/dispatcher" class="demo-role-btn {% if active_page == 'dispatcher' %}active{% endif %}" data-path="/dispatcher" onclick="RESQ.switchRole('DISPATCHER', '/dispatcher'); return false;">
           <span>🎧</span> Dispatcher
@@ -117,16 +117,12 @@
       </nav>
     </div>
 
-    <!-- Live Status & Simulation Trigger -->
-    <div style="display: flex; align-items: center; gap: 14px;">
+    <!-- Live Status -->
+    <div style="display: flex; align-items: center;">
       <div style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #94A3B8; padding: 5px 12px; background: rgba(255,255,255,0.05); border-radius: 9999px; border: 1px solid rgba(255,255,255,0.08);">
         <span id="ws-status-dot" class="pulsing-dot emerald"></span>
         <span id="ws-status-text">WS Live</span>
       </div>
-
-      <button id="global-sim-btn" class="btn btn-emerald btn-sm" style="font-size: 0.82rem; font-weight: 700;">
-        <span>▶ 1-Click Live Simulation</span>
-      </button>
     </div>
   </header>
 
