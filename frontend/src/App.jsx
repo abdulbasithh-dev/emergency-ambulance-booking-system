@@ -10,6 +10,8 @@ import { DriverDashboard } from './pages/DriverDashboard';
 import { HospitalDashboard } from './pages/HospitalDashboard';
 import { DispatcherDashboard } from './pages/DispatcherDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { CitizenAuthPage } from './pages/CitizenAuthPage';
+import { DriverLoginPage } from './pages/DriverLoginPage';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -73,19 +75,16 @@ const MainLayout = () => {
     };
   }, []);
 
-  // Sync role when URL route changes
+  // Sync role for non-authenticated demo personas (Hospital, Dispatcher, Admin)
   React.useEffect(() => {
     if (!loading) {
       const path = (currentPath || window.location.pathname).replace(/^\//, '').toLowerCase().split('/')[0];
-      const roleMap = {
-        citizen: 'CITIZEN',
-        user: 'CITIZEN',
-        driver: 'AMBULANCE_DRIVER',
+      const demoPersonaRoles = {
         hospital: 'HOSPITAL_STAFF',
         dispatcher: 'DISPATCHER',
         admin: 'ADMIN',
       };
-      const targetRole = roleMap[path];
+      const targetRole = demoPersonaRoles[path];
       if (targetRole && (!user || user.role !== targetRole)) {
         demoLogin(targetRole).catch(() => {});
       }
@@ -112,43 +111,75 @@ const MainLayout = () => {
     );
   }
 
-  // Determine which dashboard to render based on URL route and user role
+  // Determine which dashboard to render based on URL route and authenticated status
   const renderDashboard = () => {
     const clean = (currentPath || window.location.pathname).replace(/^\//, '').toLowerCase().split('/')[0];
-    const isRoot = !clean || clean === 'home' || clean === 'portal';
+    const search = window.location.search;
+    const isBookingIntent = search.includes('intent=book') || search.includes('openBooking=true');
 
-    if (isRoot) {
+    if (!clean || clean === 'home' || clean === 'portal') {
       return <LandingPage onOpenEmergencyModal={() => setEmergencyModalOpen(true)} />;
     }
 
-    const pathToRole = {
-      citizen: 'CITIZEN',
-      user: 'CITIZEN',
-      driver: 'AMBULANCE_DRIVER',
-      hospital: 'HOSPITAL_STAFF',
-      dispatcher: 'DISPATCHER',
-      admin: 'ADMIN',
-    };
-
-    const targetRole = pathToRole[clean] || user?.role;
-
-    switch (targetRole) {
-      case 'CITIZEN':
-      case 'USER':
-        return <UserDashboard onOpenEmergencyModal={() => setEmergencyModalOpen(true)} />;
-      case 'AMBULANCE_DRIVER':
-      case 'DRIVER':
-        return <DriverDashboard />;
-      case 'HOSPITAL_STAFF':
-      case 'HOSPITAL':
-        return <HospitalDashboard />;
-      case 'DISPATCHER':
-        return <DispatcherDashboard />;
-      case 'ADMIN':
-        return <AdminDashboard />;
-      default:
-        return <LandingPage onOpenEmergencyModal={() => setEmergencyModalOpen(true)} />;
+    // Citizen Login Route
+    if (clean === 'citizen-login') {
+      return (
+        <CitizenAuthPage
+          bookingIntent={isBookingIntent}
+          onLoginSuccess={({ openBooking } = {}) => {
+            if (openBooking) {
+              setEmergencyModalOpen(true);
+            }
+          }}
+        />
+      );
     }
+
+    // Driver Login Route
+    if (clean === 'driver-login') {
+      return <DriverLoginPage onLoginSuccess={() => {}} />;
+    }
+
+    // Protected Citizen Portal
+    if (clean === 'citizen' || clean === 'user') {
+      const isCitizenLoggedIn = user && (user.role === 'CITIZEN' || user.role === 'USER');
+      if (!isCitizenLoggedIn) {
+        return (
+          <CitizenAuthPage
+            bookingIntent={isBookingIntent}
+            onLoginSuccess={({ openBooking } = {}) => {
+              if (openBooking) {
+                setEmergencyModalOpen(true);
+              }
+            }}
+          />
+        );
+      }
+      return <UserDashboard onOpenEmergencyModal={() => setEmergencyModalOpen(true)} />;
+    }
+
+    // Protected Driver Portal
+    if (clean === 'driver') {
+      const isDriverLoggedIn = user && user.role === 'AMBULANCE_DRIVER';
+      if (!isDriverLoggedIn) {
+        return <DriverLoginPage onLoginSuccess={() => {}} />;
+      }
+      return <DriverDashboard />;
+    }
+
+    if (clean === 'hospital') {
+      return <HospitalDashboard />;
+    }
+
+    if (clean === 'dispatcher') {
+      return <DispatcherDashboard />;
+    }
+
+    if (clean === 'admin') {
+      return <AdminDashboard />;
+    }
+
+    return <LandingPage onOpenEmergencyModal={() => setEmergencyModalOpen(true)} />;
   };
 
   return (

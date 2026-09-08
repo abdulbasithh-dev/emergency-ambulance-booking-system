@@ -8,6 +8,10 @@ class UserRole(str, Enum):
     DISPATCHER = "DISPATCHER"
     ADMIN = "ADMIN"
 
+class DutyStatus(str, Enum):
+    ON_DUTY = "ON_DUTY"
+    OFF_DUTY = "OFF_DUTY"
+
 class AmbulanceStatus(str, Enum):
     AVAILABLE = "AVAILABLE"
     OFFLINE = "OFFLINE"

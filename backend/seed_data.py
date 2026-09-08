@@ -51,8 +51,8 @@ async def seed(custom_engine=None, custom_session_maker=None):
             email="user@resq.com",
             hashed_password=hashed_pwd,
             full_name="Sarah Jenkins",
-            phone_number="+91 98400 11111",
-            role=UserRole.USER,
+            phone_number="9876543210",
+            role=UserRole.CITIZEN,
             emergency_contact="+91 98400 99999 (Brother)",
         )
 
@@ -60,7 +60,9 @@ async def seed(custom_engine=None, custom_session_maker=None):
             email="driver@resq.com",
             hashed_password=hashed_pwd,
             full_name="Rajesh Kumar",
-            phone_number="+91 98400 22222",
+            phone_number="9840022222",
+            driver_id="DRV-101",
+            duty_status="ON_DUTY",
             role=UserRole.AMBULANCE_DRIVER,
             emergency_contact="+91 98400 88888",
         )

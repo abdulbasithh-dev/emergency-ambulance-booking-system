@@ -71,24 +71,6 @@
     </div>
   </div>
 
-  <!-- Live City Tactical Overview Section -->
-  <section style="max-width: 1200px; margin: 0 auto 60px; padding: 0 24px;">
-    <div class="glass-panel" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-        <div>
-          <h2 style="font-size: 1.4rem; color: #FFF;">Active City Telemetry Radar</h2>
-          <p style="font-size: 0.85rem; color: #94A3B8;">Live ambulances patrolling Chennai / Potheri corridor ready for immediate dispatch.</p>
-        </div>
-        <a href="/citizen" class="btn btn-primary btn-sm">
-          <span>🚨 Open Citizen SOS Console &rarr;</span>
-        </a>
-      </div>
-
-      <!-- Preview Map Container -->
-      <div id="landing-preview-map" style="width: 100%; height: 420px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1);"></div>
-    </div>
-  </section>
-
   <!-- Emergency Services Grid -->
   <section style="max-width: 1200px; margin: 0 auto 60px; padding: 0 24px;">
     <div style="text-align: center; margin-bottom: 36px;">
@@ -135,49 +117,4 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-  // Initialize landing preview map
-  document.addEventListener('DOMContentLoaded', async () => {
-    const map = RESQ_MAP.init('landing-preview-map', {
-      center: [12.8235, 80.0445],
-      zoom: 14,
-    });
-
-    try {
-      // Fetch ambulances and hospitals
-      const [ambRes, hospRes] = await Promise.all([
-        fetch('/api/v1/ambulances/').then(r => r.json()),
-        fetch('/api/v1/hospitals/').then(r => r.json()),
-      ]);
-
-      // Add ambulances
-      ambRes.forEach(amb => {
-        const lat = amb.current_latitude || amb.current_lat;
-        const lng = amb.current_longitude || amb.current_lng;
-        if (lat && lng) {
-          const icon = RESQ_MAP.createAmbulanceIcon(amb, false);
-          L.marker([lat, lng], { icon }).addTo(map).bindPopup(`
-            <strong>${amb.vehicle_number}</strong><br>
-            Type: ${amb.ambulance_type}<br>
-            Status: ${amb.availability_status}
-          `);
-        }
-      });
-
-      // Add hospitals
-      hospRes.forEach(hosp => {
-        if (hosp.latitude && hosp.longitude) {
-          const icon = RESQ_MAP.createHospitalIcon(hosp, false);
-          L.marker([hosp.latitude, hosp.longitude], { icon }).addTo(map).bindPopup(`
-            <strong>${hosp.name}</strong><br>
-            ICU Beds: ${hosp.icu_beds_available}<br>
-            Status: ${hosp.emergency_department_status}
-          `);
-        }
-      });
-    } catch (e) {
-      console.warn('Could not load map markers', e);
-    }
-  });
-</script>
 {% endblock %}

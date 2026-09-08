@@ -4,11 +4,13 @@ from pydantic import BaseModel, EmailStr
 from app.models.enums import UserRole
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: Optional[str] = None
     full_name: str
     phone_number: str
     role: UserRole = UserRole.USER
     emergency_contact: Optional[str] = None
+    driver_id: Optional[str] = None
+    duty_status: Optional[str] = "OFF_DUTY"
 
 class UserRegister(UserBase):
     password: str
@@ -16,6 +18,23 @@ class UserRegister(UserBase):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+class CitizenRegisterRequest(BaseModel):
+    full_name: str
+    mobile_number: str
+    password: str
+    confirm_password: str
+
+class CitizenLoginRequest(BaseModel):
+    mobile_number: str
+    password: str
+
+class DriverLoginRequest(BaseModel):
+    identifier: str
+    password: str
+
+class DutyStatusUpdateRequest(BaseModel):
+    duty_status: str
 
 class DemoLoginRequest(BaseModel):
     role: Optional[str] = "CITIZEN"

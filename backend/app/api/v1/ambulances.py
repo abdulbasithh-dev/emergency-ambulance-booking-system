@@ -15,6 +15,7 @@ from app.schemas.ambulance import (
     AmbulanceLocationUpdate,
     DriverStatusUpdate,
 )
+from app.schemas.emergency import EmergencyResponse
 from app.api.deps import get_current_user, require_roles
 from app.services.matching_service import AmbulanceMatchingService
 from app.services.emergency_service import EmergencyService
@@ -254,7 +255,41 @@ async def driver_accept_emergency(
     if not emergency:
         raise HTTPException(status_code=404, detail="Emergency not found")
 
+    amb = await db.get(Ambulance, ambulance_id)
+    if not amb:
+        raise HTTPException(status_code=404, detail="Ambulance not found")
+
+    # Driver Emergency Acceptance Rule: ONLY when Duty Status = ON DUTY
+    if current_user.role == UserRole.AMBULANCE_DRIVER:
+        if getattr(current_user, "duty_status", "OFF_DUTY") != "ON_DUTY":
+            raise HTTPException(
+                status_code=400,
+                detail="Driver is currently OFF DUTY and cannot accept emergency requests. Please go ON DUTY first."
+            )
+    if amb.availability_status == AmbulanceStatus.OFF_DUTY:
+        raise HTTPException(
+            status_code=400,
+            detail="Ambulance is currently OFF DUTY and cannot accept emergency requests."
+        )
+
+    # Prevent accepting if already handling another active emergency (BUSY)
+    stmt_active = select(EmergencyRequest).where(
+        EmergencyRequest.assigned_ambulance_id == ambulance_id,
+        EmergencyRequest.status.notin_([EmergencyStatus.CASE_COMPLETED, EmergencyStatus.CANCELLED]),
+        EmergencyRequest.id != emergency_id,
+    )
+    existing_active = (await db.execute(stmt_active)).scalar_one_or_none()
+    if existing_active:
+        raise HTTPException(
+            status_code=400,
+            detail="Driver is already busy handling an active emergency and cannot accept another emergency."
+        )
+
     client_ip = request.client.host if request.client else None
+    amb.availability_status = AmbulanceStatus.ON_TRIP
+    emergency.assigned_driver_id = current_user.id
+    await db.commit()
+
     updated = await EmergencyService.update_status(
         db=db,
         emergency_id=emergency_id,
@@ -263,7 +298,7 @@ async def driver_accept_emergency(
         notes="Driver acknowledged and accepted the emergency call.",
         client_ip=client_ip,
     )
-    return {"status": "accepted", "emergency": updated}
+    return {"status": "accepted", "emergency": EmergencyResponse.model_validate(updated)}
 
 @router.post("/{ambulance_id}/reject")
 async def driver_reject_emergency(

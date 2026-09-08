@@ -87,9 +87,15 @@ class AmbulanceMatchingService:
             result_fallback = await db.execute(stmt_fallback)
             available_ambulances = result_fallback.scalars().all()
 
+        # Enforce Rule 5 & 6: Only ON DUTY + AVAILABLE drivers are eligible
+        eligible_ambulances = [
+            amb for amb in available_ambulances
+            if not (amb.driver and getattr(amb.driver, "duty_status", "OFF_DUTY") == "OFF_DUTY")
+        ]
+
         ranked_list: List[NearbyAmbulanceMatch] = []
 
-        for amb in available_ambulances:
+        for amb in eligible_ambulances:
             dist = haversine_distance(amb.current_lat, amb.current_lng, pickup_lat, pickup_lng)
             if dist > max_radius_km:
                 continue

@@ -220,6 +220,7 @@ class EmergencyService:
 
         old_status = emergency.status.value
         emergency.assigned_ambulance_id = ambulance_id
+        emergency.assigned_driver_id = ambulance.driver_id
         emergency.status = EmergencyStatus.AMBULANCE_ASSIGNED
         emergency.estimated_distance_km = dist
         emergency.estimated_eta_minutes = eta

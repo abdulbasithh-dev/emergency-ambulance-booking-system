@@ -216,8 +216,8 @@ export const DemoControlBar = () => {
     setSwitchingRole(true);
     const routeMap = {
       PORTAL: '/',
-      CITIZEN: '/citizen',
-      AMBULANCE_DRIVER: '/driver',
+      CITIZEN: (user && (user.role === 'CITIZEN' || user.role === 'USER')) ? '/citizen' : '/citizen-login',
+      AMBULANCE_DRIVER: (user && user.role === 'AMBULANCE_DRIVER') ? '/driver' : '/driver-login',
       HOSPITAL_STAFF: '/hospital',
       DISPATCHER: '/dispatcher',
       ADMIN: '/admin',
@@ -238,15 +238,27 @@ export const DemoControlBar = () => {
 
     try {
       if (role === 'PORTAL') {
-        logout();
         addToast('Home', 'Viewing Life Care public front dashboard', 'crimson');
         return;
       }
-      await demoLogin(role);
-      addToast('Role Switched', `Swapped context to ${roleLabels[role] || role}`, 'emerald');
+      if (role === 'CITIZEN') {
+        if (!user || (user.role !== 'CITIZEN' && user.role !== 'USER')) {
+          addToast('Citizen Authentication', 'Please sign in with your mobile number to access Citizen Portal', 'amber');
+          return;
+        }
+      }
+      if (role === 'AMBULANCE_DRIVER') {
+        if (!user || user.role !== 'AMBULANCE_DRIVER') {
+          addToast('Driver Authentication', 'Please sign in with Driver ID / Mobile to access Cockpit', 'amber');
+          return;
+        }
+      }
+      if (['HOSPITAL_STAFF', 'DISPATCHER', 'ADMIN'].includes(role)) {
+        await demoLogin(role);
+        addToast('Role Switched', `Swapped context to ${roleLabels[role] || role}`, 'emerald');
+      }
     } catch (err) {
       console.warn('Role switch note:', err);
-      addToast('Role Switched', `Swapped context to ${roleLabels[role] || role}`, 'emerald');
     } finally {
       setSwitchingRole(false);
     }

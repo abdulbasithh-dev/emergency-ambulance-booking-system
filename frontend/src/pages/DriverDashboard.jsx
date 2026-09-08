@@ -17,6 +17,7 @@ import {
   Phone,
   Radio,
   UserCheck,
+  LogOut,
 } from 'lucide-react';
 
 const DEFAULT_DEMO_AMBULANCE = {
@@ -69,7 +70,7 @@ const FALLBACK_HOSPITALS = [
 ];
 
 export const DriverDashboard = () => {
-  const { user } = useAuth();
+  const { user, logout, updateDutyStatus } = useAuth();
   const { subscribe, addToast } = useWebSocket();
   const [ambulance, setAmbulance] = useState(DEFAULT_DEMO_AMBULANCE);
   const [activeEmergency, setActiveEmergency] = useState(DEFAULT_DEMO_EMERGENCY);
@@ -192,9 +193,26 @@ export const DriverDashboard = () => {
     };
   }, [fetchDriverData, subscribe, addToast]);
 
-  const handleToggleDuty = async () => {
-    if (!ambulance) return;
-    if (activeEmergency) {
+  const driverDutyStatus = user?.duty_status || (ambulance?.availability_status === 'AVAILABLE' ? 'ON_DUTY' : 'OFF_DUTY');
+  const isDriverOnDuty = driverDutyStatus === 'ON_DUTY';
+  const isDriverBusy = isDriverOnDuty && !!activeEmergency && activeEmergency.status !== 'CASE_COMPLETED';
+
+  const handleGoOnDuty = async () => {
+    try {
+      await updateDutyStatus('ON_DUTY');
+      if (ambulance?.id) {
+        await ambulanceAPI.updateStatus(ambulance.id, 'AVAILABLE').catch(() => {});
+      }
+      setAmbulance((prev) => prev ? ({ ...prev, status: 'AVAILABLE', availability_status: 'AVAILABLE' }) : null);
+      addToast('Duty Status: ON DUTY', 'You are now ON DUTY and available for emergency calls.', 'emerald');
+      fetchDriverData();
+    } catch (err) {
+      console.warn('Duty status toggle error:', err);
+    }
+  };
+
+  const handleGoOffDuty = async () => {
+    if (activeEmergency && activeEmergency.status !== 'CASE_COMPLETED') {
       addToast(
         'Active Mission In Progress',
         'Cannot go off-duty while an emergency mission is active. Complete patient handover first.',
@@ -202,34 +220,47 @@ export const DriverDashboard = () => {
       );
       return;
     }
-    const currentStatus = ambulance.availability_status || ambulance.status || 'AVAILABLE';
-    const newStatus = currentStatus === 'AVAILABLE' ? 'OFF_DUTY' : 'AVAILABLE';
     try {
-      await ambulanceAPI.updateStatus(ambulance.id, newStatus);
-      setAmbulance((prev) => ({
-        ...prev,
-        status: newStatus,
-        availability_status: newStatus,
-      }));
-      addToast('Duty Status Updated', `You are now ${newStatus.replace('_', ' ')}`, 'emerald');
+      await updateDutyStatus('OFF_DUTY');
+      if (ambulance?.id) {
+        await ambulanceAPI.updateStatus(ambulance.id, 'OFF_DUTY').catch(() => {});
+      }
+      setAmbulance((prev) => prev ? ({ ...prev, status: 'OFF_DUTY', availability_status: 'OFF_DUTY' }) : null);
+      addToast('Duty Status: OFF DUTY', 'You are now OFF DUTY.', 'amber');
       fetchDriverData();
     } catch (err) {
-      setAmbulance((prev) => ({
-        ...prev,
-        status: newStatus,
-        availability_status: newStatus,
-      }));
-      addToast('Duty Status Updated', `You are now ${newStatus.replace('_', ' ')}`, 'emerald');
+      console.warn('Duty status toggle error:', err);
     }
+  };
+
+  const handleDriverLogout = () => {
+    logout();
+    window.history.pushState(null, '', '/driver-login');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    window.dispatchEvent(new CustomEvent('resq-route-change'));
   };
 
   const handleAcceptEmergency = async () => {
     if (!activeEmergency) return;
+    if (!isDriverOnDuty) {
+      addToast(
+        'Action Blocked: OFF DUTY',
+        'Driver is currently OFF DUTY and cannot accept emergency requests. Please go ON DUTY first.',
+        'crimson'
+      );
+      return;
+    }
     try {
       if (ambulance) {
-        await ambulanceAPI.updateStatus(ambulance.id, 'DISPATCHED').catch(() => {});
+        await ambulanceAPI.acceptEmergency(ambulance.id, activeEmergency.id || activeEmergency.emergency_id);
       }
-    } catch {}
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      if (detail) {
+        addToast('Acceptance Failed', detail, 'crimson');
+        return;
+      }
+    }
     await handleAdvanceStatus('EN_ROUTE_TO_PICKUP');
     addToast('Ambulance Accepted', 'Your ambulance is on the way.', 'emerald');
     window.dispatchEvent(new CustomEvent('resq-toast-broadcast', {
@@ -455,32 +486,109 @@ export const DriverDashboard = () => {
         </div>
 
         {/* Duty Toggle & Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            onClick={handleToggleDuty}
-            disabled={!!activeEmergency}
-            title={activeEmergency ? "Cannot toggle duty while on an active emergency mission" : "Toggle Duty Status"}
-            className={`btn btn-sm ${
-              (ambulance?.availability_status || ambulance?.status) === 'AVAILABLE'
-                ? 'btn-outline'
-                : 'btn-emerald'
-            }`}
-            style={{
-              opacity: activeEmergency ? 0.65 : 1,
-              cursor: activeEmergency ? 'not-allowed' : 'pointer',
-            }}
-          >
-            <Radio size={14} />
-            <span>
-              {activeEmergency
-                ? 'Mission In Progress (Locked)'
-                : (ambulance?.availability_status || ambulance?.status) === 'AVAILABLE'
-                ? 'Go Off-Duty'
-                : 'Go Online (Available)'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          {/* Duty State Indicator */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 14px',
+            borderRadius: '999px',
+            background: isDriverBusy
+              ? 'rgba(239, 68, 68, 0.15)'
+              : isDriverOnDuty
+              ? 'rgba(16, 185, 129, 0.15)'
+              : 'rgba(148, 163, 184, 0.12)',
+            border: `1px solid ${
+              isDriverBusy ? '#EF4444' : isDriverOnDuty ? '#10B981' : 'rgba(148, 163, 184, 0.3)'
+            }`,
+          }}>
+            <span
+              className="pulsing-dot"
+              style={{
+                width: '8px',
+                height: '8px',
+                background: isDriverBusy ? '#EF4444' : isDriverOnDuty ? '#10B981' : '#94A3B8',
+              }}
+            />
+            <span style={{
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              letterSpacing: '0.04em',
+              color: isDriverBusy ? '#FCA5A5' : isDriverOnDuty ? '#6EE7B7' : '#94A3B8',
+            }}>
+              {isDriverBusy ? 'ON DUTY + BUSY' : isDriverOnDuty ? 'ON DUTY + AVAILABLE' : 'OFF DUTY'}
             </span>
+          </div>
+
+          {/* Toggle buttons: Go On Duty / Go Off Duty */}
+          {isDriverOnDuty ? (
+            <button
+              onClick={handleGoOffDuty}
+              disabled={isDriverBusy}
+              title={isDriverBusy ? 'Cannot go off duty while handling an active emergency' : 'Go Off Duty'}
+              className="btn btn-sm btn-outline"
+              style={{
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                opacity: isDriverBusy ? 0.5 : 1,
+                cursor: isDriverBusy ? 'not-allowed' : 'pointer',
+              }}
+            >
+              ⚪ Go Off Duty
+            </button>
+          ) : (
+            <button
+              onClick={handleGoOnDuty}
+              className="btn btn-sm btn-emerald"
+              style={{ fontWeight: 700 }}
+            >
+              🟢 Go On Duty
+            </button>
+          )}
+
+          {/* Driver Logout Button */}
+          <button
+            onClick={handleDriverLogout}
+            className="btn btn-sm btn-outline"
+            style={{ borderColor: 'rgba(239, 68, 68, 0.35)', color: '#FCA5A5' }}
+            title="Sign out of driver cockpit"
+          >
+            <LogOut size={14} />
+            <span>Logout</span>
           </button>
         </div>
       </div>
+
+      {/* OFF DUTY NOTIFICATION BANNER */}
+      {!isDriverOnDuty && (
+        <div style={{
+          background: 'rgba(245, 158, 11, 0.12)',
+          border: '1px solid rgba(245, 158, 11, 0.3)',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          flexWrap: 'wrap',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <AlertTriangle size={22} color="#F59E0B" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: '0.95rem', color: '#FDE68A', fontWeight: 600 }}>
+              You are currently off duty. Go on duty to receive emergency requests.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleGoOnDuty}
+            className="btn btn-sm btn-emerald"
+            style={{ fontWeight: 700, padding: '8px 20px', flexShrink: 0 }}
+          >
+            🟢 Go On Duty
+          </button>
+        </div>
+      )}
 
       {/* Active Mission Alert / HUD */}
       {activeEmergency ? (
@@ -580,15 +688,31 @@ export const DriverDashboard = () => {
                   Citizen Destination: <strong style={{ color: '#38BDF8' }}>{(activeEmergency.selected_hospital || activeEmergency.destination_hospital)?.name || 'Citizen Selected Hospital'}</strong>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={handleAcceptEmergency}
-                className="btn btn-lg btn-emerald"
-                style={{ fontWeight: 800, padding: '12px 28px', fontSize: '1.05rem', boxShadow: '0 0 20px rgba(16, 185, 129, 0.6)' }}
-              >
-                <UserCheck size={20} />
-                <span>ACCEPT EMERGENCY</span>
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                <button
+                  type="button"
+                  disabled={!isDriverOnDuty}
+                  onClick={handleAcceptEmergency}
+                  className={`btn btn-lg ${isDriverOnDuty ? 'btn-emerald' : 'btn-outline'}`}
+                  style={{
+                    fontWeight: 800,
+                    padding: '12px 28px',
+                    fontSize: '1.05rem',
+                    boxShadow: isDriverOnDuty ? '0 0 20px rgba(16, 185, 129, 0.6)' : 'none',
+                    opacity: isDriverOnDuty ? 1 : 0.5,
+                    cursor: isDriverOnDuty ? 'pointer' : 'not-allowed',
+                  }}
+                  title={!isDriverOnDuty ? 'You must be ON DUTY to accept emergencies' : 'Accept Emergency'}
+                >
+                  <UserCheck size={20} />
+                  <span>ACCEPT EMERGENCY</span>
+                </button>
+                {!isDriverOnDuty && (
+                  <span style={{ color: '#FCA5A5', fontSize: '0.8rem', fontWeight: 600 }}>
+                    ⚠️ Locked: Driver is OFF DUTY
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
@@ -599,13 +723,19 @@ export const DriverDashboard = () => {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               <button
+                disabled={!isDriverOnDuty}
                 onClick={handleAcceptEmergency}
                 className={`btn btn-sm ${
                   activeEmergency.status === 'EN_ROUTE_TO_PICKUP' || activeEmergency.status === 'AMBULANCE_EN_ROUTE'
                     ? 'btn-primary'
-                    : 'btn-emerald'
+                    : isDriverOnDuty ? 'btn-emerald' : 'btn-outline'
                 }`}
-                style={{ fontWeight: 700 }}
+                style={{
+                  fontWeight: 700,
+                  opacity: isDriverOnDuty ? 1 : 0.5,
+                  cursor: isDriverOnDuty ? 'pointer' : 'not-allowed',
+                }}
+                title={!isDriverOnDuty ? 'Must be ON DUTY to accept mission' : 'Accept Mission'}
               >
                 1. Accept &amp; En Route to Patient
               </button>

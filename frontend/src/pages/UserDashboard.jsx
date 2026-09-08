@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { emergencyAPI, hospitalAPI } from '../api';
+import { useAuth } from '../context/AuthContext';
 import { useWebSocket } from '../context/WebSocketContext';
 import { STATIC_HOSPITALS } from '../constants/hospitals';
 import { LiveMap } from '../components/LiveMap';
@@ -15,6 +16,7 @@ import {
   Navigation,
   ShieldCheck,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
 
 const STATUS_STEPS = [
@@ -64,6 +66,7 @@ const formatStatus = (status) => {
 };
 
 export const UserDashboard = ({ onOpenEmergencyModal }) => {
+  const { user, logout } = useAuth();
   const { subscribe, addToast } = useWebSocket();
   const [activeEmergency, setActiveEmergency] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -75,6 +78,23 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
     lat: 12.8235,
     lng: 80.0445,
   });
+
+  const handleCitizenLogout = () => {
+    logout();
+    window.history.pushState(null, '', '/citizen-login');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    window.dispatchEvent(new CustomEvent('resq-route-change'));
+  };
+
+  useEffect(() => {
+    if (window.location.search.includes('openBooking=true')) {
+      if (onOpenEmergencyModal) {
+        onOpenEmergencyModal();
+      }
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState(null, '', cleanUrl);
+    }
+  }, [onOpenEmergencyModal]);
 
   const fetchActive = useCallback(async () => {
     try {
@@ -298,14 +318,34 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
             </div>
           </div>
 
-          <button
-            onClick={onOpenEmergencyModal}
-            className="btn btn-lg btn-primary"
-            style={{ fontSize: '1.05rem', padding: '12px 28px', borderRadius: '12px', fontWeight: 700 }}
-          >
-            <HeartPulse size={20} />
-            <span>🚨 REQUEST EMERGENCY AMBULANCE NOW</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <button
+              onClick={onOpenEmergencyModal}
+              className="btn btn-lg btn-primary"
+              style={{ fontSize: '1.05rem', padding: '12px 28px', borderRadius: '12px', fontWeight: 700 }}
+            >
+              <HeartPulse size={20} />
+              <span>🚨 REQUEST EMERGENCY AMBULANCE NOW</span>
+            </button>
+            <button
+              onClick={handleCitizenLogout}
+              className="btn btn-outline"
+              style={{
+                borderColor: 'rgba(239, 68, 68, 0.4)',
+                color: '#FCA5A5',
+                padding: '12px 18px',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontWeight: 600,
+              }}
+              title="Logout from Citizen Account"
+            >
+              <LogOut size={16} />
+              <span>Logout</span>
+            </button>
+          </div>
         </div>
 
         {/* Live Radar Map Card with Nearby Ambulances Cruising Around User Pickup */}
@@ -489,13 +529,24 @@ export const UserDashboard = ({ onOpenEmergencyModal }) => {
           )}
         </div>
 
-        <button
-          onClick={() => setCancelModalOpen(true)}
-          className="btn btn-sm btn-danger-outline"
-        >
-          <XCircle size={15} />
-          <span>Cancel Emergency</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => setCancelModalOpen(true)}
+            className="btn btn-sm btn-danger-outline"
+          >
+            <XCircle size={15} />
+            <span>Cancel Emergency</span>
+          </button>
+          <button
+            onClick={handleCitizenLogout}
+            className="btn btn-sm btn-outline"
+            style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: '#FCA5A5' }}
+            title="Logout from Citizen Account"
+          >
+            <LogOut size={15} />
+            <span>Logout</span>
+          </button>
+        </div>
       </div>
 
       {/* Progress Pipeline Stepper */}

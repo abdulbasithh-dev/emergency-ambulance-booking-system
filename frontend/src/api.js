@@ -47,6 +47,10 @@ export const authAPI = {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
   }),
   demoLogin: (role) => api.post('/auth/demo-login', { role }),
+  citizenLogin: (mobile_number, password) => api.post('/auth/citizen/login', { mobile_number, password }),
+  citizenRegister: (data) => api.post('/auth/citizen/register', data),
+  driverLogin: (identifier, password) => api.post('/auth/driver/login', { identifier, password }),
+  updateDutyStatus: (duty_status) => api.post('/auth/driver/duty-status', { duty_status }),
   register: (data) => api.post('/auth/register', data),
   getMe: () => api.get('/auth/me'),
 };
@@ -70,6 +74,8 @@ export const ambulanceAPI = {
   getNearby: (lat, lng, radius) => api.get('/ambulances/nearby', { params: { latitude: lat, longitude: lng, radius_km: radius } }),
   getOne: (id) => api.get(`/ambulances/${id}`),
   updateStatus: (id, status) => api.patch(`/ambulances/${id}/status`, null, { params: { status } }),
+  acceptEmergency: (ambulanceId, emergencyId) => api.post(`/ambulances/${ambulanceId}/accept?emergency_id=${emergencyId}`),
+  rejectEmergency: (ambulanceId, emergencyId, reason) => api.post(`/ambulances/${ambulanceId}/reject?emergency_id=${emergencyId}&reason=${encodeURIComponent(reason || '')}`),
   updateLocation: (id, lat, lng, speed, heading) =>
     api.patch(`/ambulances/${id}/location`, { latitude: lat, longitude: lng, speed, heading }),
 };

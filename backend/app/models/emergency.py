@@ -32,6 +32,7 @@ class EmergencyRequest(Base):
     )
 
     assigned_ambulance_id = Column(Integer, ForeignKey("ambulances.id"), nullable=True, index=True)
+    assigned_driver_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     selected_hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=True, index=True)
 
     estimated_distance_km = Column(Float, nullable=True)
